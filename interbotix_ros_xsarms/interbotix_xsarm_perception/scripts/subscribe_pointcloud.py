@@ -55,7 +55,7 @@ class image_feature:
             print ('received image of type: "%s"' % ros_data.format)
 
         if self.once:
-            data = list(point_cloud2.read_points(ros_data, skip_nans=True))
+            data = point_cloud2.read_points_list(ros_data, skip_nans=True, field_names = ("x", "y", "z")))
             # x, y, z, ?
             # print(len(data))
             print(data)
