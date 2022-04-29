@@ -73,7 +73,7 @@
     <arg name="use_pointcloud_tuner_gui"          value="$(arg use_pointcloud_tuner_gui)"/>
   </include>
 
-  <include file="$(find interbotix_perception_modules)/launch/armtag.launch">
+  <!-- <include file="$(find interbotix_perception_modules)/launch/armtag.launch">
     <arg name="tag_family"                        value="$(arg tag_family)"/>
     <arg name="standalone_tags"                   value="$(arg standalone_tags)"/>
     <arg name="camera_frame"                      value="$(arg camera_frame)"/>
@@ -86,12 +86,12 @@
     <arg name="arm_tag_frame"                     value="$(arg arm_tag_frame)"/>
     <arg name="use_armtag_tuner_gui"              value="$(arg use_armtag_tuner_gui)"/>
     <arg name="position_only"                     value="$(arg position_only)"/>
-  </include>
+  </include> -->
 
-  <include file="$(find interbotix_perception_modules)/launch/static_transform_pub.launch">
+  <!-- <include file="$(find interbotix_perception_modules)/launch/static_transform_pub.launch">
     <arg name="load_transforms"                   value="$(arg load_transforms)"/>
     <arg name="transform_filepath"                value="$(arg transform_filepath)"/>
-  </include>
+  </include> -->
 
   <node if="$(arg use_rviz)"
     name="rviz"
@@ -99,5 +99,59 @@
     type="rviz"
     args="-f $(arg rviz_frame) -d $(arg rvizconfig)"
     ns="$(arg robot_name)"/>
+  
+  <!-- 
+   Obtained from Eye-Hand calibration 
+    xyz="0.156406 0.0259245 0.484008" rpy="0.72163 1.65276 -0.69622" -->
+  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster"
+      args="0.156406 0.0259245 0.484008   -0.009883 0.728445 0.0278353 0.684467 wx250s/base_link camera_link" /> -->
 
+<!-- good 2  high-->
+  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster"
+      args="0.184792 0.0205145 0.683906   -0.015482 0.712955 0.0763007 0.696874 wx250s/base_link camera_link" /> -->
+
+        <!-- good 3 -->
+  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster"
+      args="0.208194 -0.0127812 0.772507   0.0293346 0.715755 0.00451017 0.69772 wx250s/base_link camera_link" /> -->
+
+        <!-- good otate -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster"
+      args="0.195 -0.0085 0.601318   0.00633201 0.721724 0.032703 0.691379 wx250s/base_link camera_link" />
+
+
+
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_link_broadcaster"
+    args="
+      0.18 0.02 0.605
+      -0.0220684 0.717753 0.0500634 0.694145
+      wx250s/base_link camera_link 100" /> -->
+
+
+
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_link_broadcaster"
+    args="
+      -0.028 0.002 -0.164
+      0.006 -0.402 0.012
+      wx250s/base_link camera_link 100" /> -->
+
+  <!-- <node pkg="tf" type="static_transform_publisher" name="camera_link_broadcaster"
+      args="0.332524 0.162719 1.4249   -0.0220684 0.717753 0.0500634 0.694145 wx250s/base_link camera_link 100" /> -->
+
+<!-- x, y, z
+qx, qy, qz, qw
+ -->
 </launch>
+
+  <!-- qw: 0.9617012127006496
+  qx: 0.0004536107650512624
+  qy: -0.27409726980454197
+  qz: 0.0011217901185121418
+  x: 0.004208716582592607
+  y: 0.00024383931656015478
+  z: -0.17176515107458268 -->
+
+
+<!-- 
+    Henry's hand-tuned
+      0.18 0.02 0.605
+      -0.0220684 0.717753 0.0500634 0.694145 -->

@@ -1,21 +1,50 @@
 import time
 from interbotix_xs_modules.arm import InterbotixManipulatorXS
-# from interbotix_perception_modules.armtag import InterbotixArmTagInterface
 from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 
-# This script uses a color/depth camera to get the arm to find objects and pick them up.
-# For this demo, the arm is placed to the left of the camera facing outward. When the
-# end-effector is located at x=0, y=-0.3, z=0.2 w.r.t. the 'wx200/base_link' frame, the AR
-# tag should be clearly visible to the camera. A small basket should also be placed in front of the arm.
-#
-# To get started, open a terminal and type 'roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s'
-# Then change to this directory and type 'python pick_place.py'
+# First, run: roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s
+# Then change to this directory and type: python3 roll_dough.py
+
 
 def main():
-    # Initialize the arm module along with the pointcloud and armtag modules
+    # Initialize the arm module along with the pointcloud module
     bot = InterbotixManipulatorXS("wx250s")#, moving_time=5, accel_time=5)
     pcl = InterbotixPointCloudInterface()
-    # armtag = InterbotixArmTagInterface()
+
+    # Move to ReadyPose
+    bot.arm.set_ee_pose_components(x=?, y=0, z=?, pitch=1.57)
+    # Record the target dough shape
+    todo
+
+    # Iterative procedure
+    while not terminate:
+
+        # Detect the roll starting point S
+        _, cluster = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
+        S = cluster['position']
+
+        # Calculate the roll goal point G
+        todo
+
+        # Move to AboveBeforePose
+        bot.arm.set_ee_pose_components(x=Sx, y=Sy, z=Sz+d, pitch=1.57, yaw=angle(S->G))
+
+        # Move to TouchPose
+        bot.arm.set_ee_pose_components(x=Sx, y=Sy, z=Sz, pitch=1.57, yaw=angle(S->G))
+
+        # Perform roll to point G
+        bot.arm.set_ee_pose_components(x=Gx, y=Gy, z=Gz, pitch=1.57, yaw=angle(S->G))
+
+        # Move to AboveAfterPose
+        bot.arm.set_ee_pose_components(x=Gx, y=Gy, z=Gz+d, pitch=1.57, yaw=angle(S->G))
+
+        # Move to ReadyPose
+        bot.arm.set_ee_pose_components(x=?, y=0, z=?, pitch=1.57)
+
+
+
+
+
 
     # set initial arm and gripper pose
     # bot.arm.set_ee_pose_components(x=0.3, z=0.2)
