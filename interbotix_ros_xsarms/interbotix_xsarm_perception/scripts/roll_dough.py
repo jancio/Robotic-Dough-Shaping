@@ -7,11 +7,14 @@
 ######################################################################################################
 
 from time import time
-import math.pi as PI
+import numpy as np
 from interbotix_xs_modules.arm import InterbotixManipulatorXS
 from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 
 
+def calculate_iou():
+    #TODO
+    return iou
 
 
 def main():
@@ -24,11 +27,13 @@ def main():
     #########################
 
     method = 'basic'
-    # Choose one termination condition
+    # Choose one of the termination conditions below
     termination_condition = 'max_time'
     termination_condition = 'min_iou'
     max_time = 10 # in seconds
     min_iou = 0.5
+    # Vertical distance above the dough immediately before and after rolling
+    z_above = 0.15812
 
     if termination_condition == 'max_time':
         def terminate(t, iou):
@@ -37,7 +42,7 @@ def main():
         def terminate(t, iou):
             return iou >= min_iou
     else:
-        raise ValueError(f'Unknown terminationcondition {termination_condition}')
+        raise ValueError(f'Unknown termination condition {termination_condition}')
 
     # Logging
     print('=' * 120)
@@ -56,7 +61,7 @@ def main():
     iou = 0.
 
     # Move to ReadyPose
-    bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=PI/2)
+    bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=np.pi/2)
 
     # Record the target dough shape
     #TODO
@@ -66,7 +71,7 @@ def main():
     # iou = calculate_iou()
 
     # Logging
-    print(f'Preparation time: {time() - start_time} s')
+    print(f'Preparation: \t Time: {time() - start_time:5.3f} s\t IoU: {iou:.3f}')
     print('=' * 120)
 
     #########################
@@ -85,20 +90,25 @@ def main():
         #TODO
         print(f'Calculated roll goal point G: x, y, z =')
 
+        # Calculate the angle of the direction S -> G
+        # No need to use arctan2 due to symmetry
+        yaw_SG = np.arctan((Gy - Sy) / (Gx - Sx))
+        print(f'Calculated the angle of the direction S -> G: {yaw_SG * 180 / np.pi}')
+
         # Move to AboveBeforePose
-        bot.arm.set_ee_pose_components(x=Sx, y=Sy, z=Sz+d, pitch=PI/2, yaw=angle(S->G))
+        bot.arm.set_ee_pose_components(x=Sx, y=Sy, z=Sz + z_above, pitch=np.pi/2, yaw=yaw_SG)
 
         # Move to TouchPose
-        bot.arm.set_ee_pose_components(x=Sx, y=Sy, z=Sz, pitch=PI/2, yaw=angle(S->G))
+        bot.arm.set_ee_pose_components(x=Sx, y=Sy, z=Sz, pitch=np.pi/2, yaw=yaw_SG)
 
         # Perform roll to point G
-        bot.arm.set_ee_pose_components(x=Gx, y=Gy, z=Gz, pitch=PI/2, yaw=angle(S->G))
+        bot.arm.set_ee_pose_components(x=Gx, y=Gy, z=Gz, pitch=np.pi/2, yaw=yaw_SG)
 
         # Move to AboveAfterPose
-        bot.arm.set_ee_pose_components(x=Gx, y=Gy, z=Gz+d, pitch=PI/2, yaw=angle(S->G))
+        bot.arm.set_ee_pose_components(x=Gx, y=Gy, z=Gz + z_above, pitch=np.pi/2, yaw=yaw_SG)
 
         # Move to ReadyPose
-        bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=PI/2)
+        bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=np.pi/2)
 
         # Calculate current IoU
         #TODO
