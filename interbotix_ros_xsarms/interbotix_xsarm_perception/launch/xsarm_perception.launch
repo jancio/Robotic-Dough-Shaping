@@ -115,9 +115,11 @@
       args="0.208194 -0.0127812 0.772507   0.0293346 0.715755 0.00451017 0.69772 wx250s/base_link camera_link" /> -->
 
         <!-- good otate -->
+  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster"
+      args="0.195 -0.0085 0.601318   0.00633201 0.721724 0.032703 0.691379 wx250s/base_link camera_link" /> -->
+ <!-- may7 -->
   <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_broadcaster"
-      args="0.195 -0.0085 0.601318   0.00633201 0.721724 0.032703 0.691379 wx250s/base_link camera_link" />
-
+      args="0.175572 0.0246511 0.595534   -0.0322851 0.717733 0.0304795 0.694901 wx250s/base_link camera_link" />
 
 
   <!-- <node pkg="tf" type="static_transform_publisher" name="camera_link_broadcaster"

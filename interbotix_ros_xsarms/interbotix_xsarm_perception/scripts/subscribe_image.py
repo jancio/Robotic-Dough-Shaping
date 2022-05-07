@@ -18,6 +18,7 @@ from scipy.ndimage import filters
 
 # OpenCV
 import cv2
+from PIL import Image
 
 # Ros libraries
 import roslib
@@ -56,7 +57,11 @@ class image_feature:
         np_arr = np.fromstring(ros_data.data, np.uint8)
         # image_np = cv2.imdecode(np_arr, cv2.CV_LOAD_IMAGE_COLOR)
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) # OpenCV >= 3.0:
-
+        image_np_copy = image_np.copy()
+        np.save('d8_23.npy', image_np_copy)
+        image_copy = Image.fromarray(image_np_copy)
+        image_copy.save('d8_23.png')
+        print('saved!')
 
         # bounding box
         top_left = (250,40)
@@ -70,10 +75,10 @@ class image_feature:
         # detect the contours on the binary image using cv2.CHAIN_APPROX_NONE
         contours, _ = cv2.findContours(image=thresh, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_NONE)
         # draw contours on the original image
-        image_copy = image_np.copy()
-        cv2.drawContours(image=image_copy[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]], contours=contours[1], contourIdx=-1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         
-        image_copy = cv2.rectangle(image_copy, top_left, bottom_right, (0,0,255), 1)
+        # cv2.drawContours(image=image_np_copy[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0]], contours=contours[1], contourIdx=-1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        
+        # image_np_copy = cv2.rectangle(image_np_copy, top_left, bottom_right, (0,0,255), 1)
 
 
         #### Feature detectors using CV2 #### 
@@ -95,14 +100,14 @@ class image_feature:
         #     x,y = featpoint.pt
         #     cv2.circle(image_np,(int(x),int(y)), 3, (0,0,255), -1)
         
-        cv2.imshow('cv_img', image_copy)
+        cv2.imshow('cv_img', image_np_copy)
         cv2.waitKey(2)
 
         #### Create CompressedIamge ####
         msg = CompressedImage()
         msg.header.stamp = rospy.Time.now()
         msg.format = "jpeg"
-        msg.data = np.array(cv2.imencode('.jpg', image_copy)[1]).tostring()
+        msg.data = np.array(cv2.imencode('.jpg', image_np_copy)[1]).tostring()
         # Publish new image
         self.image_pub.publish(msg)
         

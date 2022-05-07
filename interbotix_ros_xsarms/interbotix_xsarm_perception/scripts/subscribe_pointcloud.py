@@ -55,10 +55,14 @@ class image_feature:
             print ('received image of type: "%s"' % ros_data.format)
 
         if self.once:
-            data = point_cloud2.read_points_list(ros_data, skip_nans=True, field_names = ("x", "y", "z")))
+            
+            data = point_cloud2.read_points_list(ros_data, skip_nans=True, field_names = ("x", "y", "z"))
             # x, y, z, ?
+            p = np.array(data)
+            print(p.shape)
             # print(len(data))
-            print(data)
+            np.save("./target.npy", p)
+            print("save succeed")
             self.once = False
 
 

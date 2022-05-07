@@ -1,4 +1,4 @@
-cluster_max_size: 1000
+cluster_max_size: 994
 cluster_min_size: 76
 cluster_tol: 0.01
 plane_dist_thresh: 0.033
@@ -7,8 +7,8 @@ ror_min_neighbors: 1
 ror_radius_search: 0.04
 voxel_leaf_size: 0.006000000000000001
 x_filter_max: 0.18999999999999995
-x_filter_min: -0.08000000000000002
+x_filter_min: -0.15000000000000002
 y_filter_max: 0.06999999999999995
-y_filter_min: -0.5
-z_filter_max: 0.8
-z_filter_min: 0.45
+y_filter_min: -0.33999999999999997
+z_filter_max: 0.61
+z_filter_min: 0.53
