@@ -64,6 +64,8 @@ def get_current_shape():
     if current_shape_area < MIN_CONTOUR_AREA:
         print(f'Warning: the area of the current shape is {current_shape_area} which is less than {MIN_CONTOUR_AREA}')
 
+    # Undo ROI transform
+    current_shape_contour[:, 0] += np.array([ROI['x_min'], ROI['y_min']])
     return current_shape_contour
 
 
@@ -87,6 +89,21 @@ def calculate_iou(target_shape):
 
 def calculate_geometric_center(pts):
     return np.mean(pts, axis=0)[0].astype(int)
+
+
+def image2robot_coords(pts):
+    # Calculate transform parameters from two points 
+    # Ix1, Iy1 = 320, 323
+    # Ix2, Iy2 = 384, 326
+    # Rx1, Ry1 = 0.0772, 0.0322
+    # Rx2, Ry2 = 0.0756, -0.0306
+    # A = (Rx2 - Rx1) / (Ix2 - Ix1)
+    # B = Rx1 - A*Ix1
+    # C = (Ry2 - Ry1) / (Iy2 - Iy1)
+    # D = Ry1 - C*Iy1
+    # print(f'{A}, {B}, {C}, {D}')
+    A, B, C, D = -2.5000000000000066e-05, 0.08520000000000003, -0.02093333333333333, 0.04027500000000002
+    return [ (A*x + B, C*y + D) for x, y in pts ]
 
 
 def calculate_circle_line_intersection(cc, r, p1, p2):
@@ -156,9 +173,9 @@ def calculate_roll_start_and_goal(method, target_shape, pcl):
     if G is None:
         raise ValueError(f'No suitable goal point G found!')
 
-    # Transform G = image2robot_coords(G)
-    # TODO
-
+    # Transform from image to robot coordinates
+    G = image2robot_coords(G)
+    # For now, the goal point has the same z location as the start point
     G = (G[0], G[1], S[2])
     return S, G
 
@@ -184,6 +201,7 @@ def capture_target_shape():
         print(f'Warning: multiple circles detected when capturing target shape!')
 
     circles = np.round(circles[0, :]).astype("int")
+    # Undo ROI transform
     x = circles[0][0] + ROI['x_min']
     y = circles[0][1] + ROI['y_min']
     r = circles[0][2]
