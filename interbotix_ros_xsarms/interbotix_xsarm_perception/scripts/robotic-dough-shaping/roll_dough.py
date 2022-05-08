@@ -38,6 +38,7 @@ ROI = {
 }
 MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000
+WINDOW_TITLE = 'Robotic Dough Shaping'
 
 
 def get_ROI_img(img):
@@ -57,7 +58,7 @@ def get_current_shape():
     if len(contours) < 1:
         raise ValueError(f'No contours detected for the current shape!')
 
-    # Take largest contour
+    # Take the largest contour
     current_shape_contour = sorted(contours, key=lambda c: cv2.contourArea(c))[-1]
 
     current_shape_area = cv2.contourArea(current_shape_contour)
@@ -147,7 +148,7 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         return intersection + cc
 
 
-def calculate_roll_start_and_goal(method, target_shape, pcl):
+def calculate_roll_start_and_goal(method, target_shape, pcl, debug_vision):
     current_shape_contour = get_current_shape()
 
     # Calculate roll start point S
@@ -176,6 +177,20 @@ def calculate_roll_start_and_goal(method, target_shape, pcl):
     if G is None:
         raise ValueError(f'No suitable goal point G found!')
 
+    if debug_vision:
+        debug_img = rgb_img.copy()
+        # Draw the target shape
+        cv2.circle(debug_img, C, R, color=(0, 0, 255), thickness=1)
+        # Draw the current shape
+        # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
+        # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
+        overlay = rgb_img.copy()
+        cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
+        cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
+        # Draw the planned roll path
+        cv2.arrowedLine(debug_img, S[:2], G, color=(0, 0, 255), thickness=2)
+        cv2.imshow(WINDOW_TITLE, debug_img)
+
     # Transform from image to robot coordinates
     G = image2robot_coords(G)
     # For now, the goal point has the same z location as the start point
@@ -183,7 +198,7 @@ def calculate_roll_start_and_goal(method, target_shape, pcl):
     return S, G
 
 
-def capture_target_shape():
+def capture_target_shape(debug_vision):
     if not rgb_img or rgb_img.shape != (*IMG_SHAPE, 3):
         raise ValueError(f'No valid RGB image data received from camera!')
 
@@ -200,23 +215,30 @@ def capture_target_shape():
                                maxRadius=MAX_TARGET_CIRCLE_RADIUS)
     if circles is None:
         raise ValueError(f'Failed to detect circular target shape!')
-    if len(circles[0]) > 1:
-        print(f'Warning: multiple circles detected when capturing target shape!')
+    if len(largest_circle) > 1:
+        print(f'Warning: multiple circles detected when capturing target shape! Taking the largest one.')
 
-    circles = np.round(circles[0, :]).astype("int")
+    # Take the largest circle
+    largest_circle = sorted(circles[0], key=lambda c: c[2])[-1]
+    largest_circle = np.round(largest_circle).astype("int")
+
     # Undo ROI transform
-    x = circles[0][0] + ROI['x_min']
-    y = circles[0][1] + ROI['y_min']
-    r = circles[0][2]
+    x = largest_circle[0] + ROI['x_min']
+    y = largest_circle[1] + ROI['y_min']
+    r = largest_circle[2]
 
-    target_shape = {
+    if debug_vision:
+        debug_img = rgb_img.copy()
+        cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
+        cv2.imshow(WINDOW_TITLE, debug_img)
+
+    return {
         'type': 'circle',
         'params': {
             'center': (x, y),
             'radius': r
         }
     }
-    return target_shape
 
 
 def rgb_img_callback(ros_msg):
@@ -291,7 +313,7 @@ def main():
             go_to_ready_pose()
 
         # Capture the target dough shape
-        target_shape = capture_target_shape()
+        target_shape = capture_target_shape(args.debug_vision)
         params.update(target_shape)
 
         # Calculate current IoU
@@ -316,7 +338,7 @@ def main():
         while not terminate(time() - start_time, iou):
 
             # Calculate the roll start point S and roll goal point G
-            S, G = calculate_roll_start_and_goal(args.method, target_shape, pcl)
+            S, G = calculate_roll_start_and_goal(args.method, target_shape, pcl, args.debug_vision)
             print(f'Calculated roll start point S: {S}')
             print(f'Calculated roll goal point G: {G}')
 
@@ -352,6 +374,8 @@ def main():
             csv_writer.writerow([iteration, time_elapsed, iou])
 
             iteration += 1
+
+    cv2.destroyAllWindows() 
 
 
 if __name__=='__main__':
