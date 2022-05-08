@@ -85,15 +85,82 @@ def calculate_iou(target_shape):
     return np.sum(intersection) / np.sum(union)
 
 
-def calculate_goal_point(S, target_shape):
-    # dict(zip(['x', 'y', 'z'], [?, ?, ?]))
+def calculate_geometric_center(pts):
+    return np.mean(pts, axis=0)[0].astype(int)
+
+
+def calculate_circle_line_intersection(cc, r, p1, p2):
+    # Args: circle center, circle radius, 
+    #       line point 1 (start point), line point 2 (candidate goal point on dough boundary)
+    # Points must be numpy arrays
+
+    # Translate to origin
+    x1, y1 = p1 - cc
+    x2, y2 = p2 - cc
+
+    # General form line equation parameters
+    a = y2 - y1
+    b = x1 - x2
+    c = y1 * x2 - x1 * y2
+
+    # Below inspired by https://cp-algorithms.com/geometry/circle-line-intersection.html
+    EPS = 1e-6
+    a2b2 = a*a + b*b
+    x0 = - a*c / a2b2
+    y0 = - b*c / a2b2
+    delta = c*c - r*r*a2b2
+    if delta > EPS:
+        # No intersecion points
+        return None
+    elif abs(delta) < EPS:
+        # One intersection point
+        # Undo initial translation to origin
+        return np.array([x0, y0]) + cc
+    else:
+        # Two intersection points
+        mult = np.sqrt((r*r - c*c/a2b2) / a2b2)
+        i1 = np.array([x0 + b*mult, y0 - a*mult])
+        i2 = np.array([x0 - b*mult, y0 + a*mult])
+        # Get intersection closer to p2 (i.e. in the direction p1->p2 of the intended roll)
+        intersection = i2 if np.linalg.norm(i1 - p2) > np.linalg.norm(i2 - p2) else i1
+        # Undo initial translation to origin
+        return intersection + cc
+
+
+def calculate_roll_start_and_goal(method, target_shape, pcl):
     current_shape_contour = get_current_shape()
-    #TODO
-    return {
-        'x': x,
-        'y': y,
-        'z': 0
-    }
+
+    # Calculate roll start point S
+    pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
+    if pcl_clusters_detected:
+        S = pcl_clusters[0]['position']
+    else:
+        S = (*calculate_geometric_center(current_shape_contour), 0.01)
+
+    # Calculate roll goal point G
+    G = None
+    C = np.array(target_shape['params']['center'])
+    R = target_shape['params']['radius']
+
+    if method == 'basic':
+        # Find the largest gap between the current and target dough shape
+        max_gap = 0
+        for P in current_shape_contour[:, 0]:
+            intersection = calculate_circle_line_intersection(C, R, S[:2], P)
+            if intersection is not None:
+                gap = np.linalg.norm(P - intersection)
+                if gap > max_gap:
+                    max_gap = gap
+                    G = P
+
+    if G is None:
+        raise ValueError(f'No suitable goal point G found!')
+
+    # Transform G = image2robot_coords(G)
+    # TODO
+
+    G = (G[0], G[1], S[2])
+    return S, G
 
 
 def capture_target_shape():
@@ -166,7 +233,6 @@ def main():
     #########################
 
     bot = InterbotixManipulatorXS("wx250s")#, moving_time=5, accel_time=5)
-    pcl = InterbotixPointCloudInterface()
 
     def go_to_ready_pose():
         bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=np.pi/2)
@@ -176,6 +242,7 @@ def main():
     # Initialize vision
     #########################
         
+    pcl = InterbotixPointCloudInterface()
     rospy.init_node('roll_dough', anonymous=True)
     rospy.Subscriber("/camera/color/image_raw/compressed", CompressedImage, rgb_img_callback,  queue_size=1)
 
@@ -227,38 +294,29 @@ def main():
         iteration = 1
         while not terminate(time() - start_time, iou):
 
-            # Detect the roll starting point S
-            #TODO try alternative?
-            clusters_detected, clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
-            if clusters_detected:
-                S = dict(zip(['x', 'y', 'z'], clusters[0]['position']))
-                print(f'Detected roll start point S: {S} from pointcloud')
-            else:
-                S = None
-
-            # Calculate the roll goal point G
-            G = calculate_goal_point(S, target_shape)
-            G['z'] = S['z']
+            # Calculate the roll start point S and roll goal point G
+            S, G = calculate_roll_start_and_goal(args.method, target_shape, pcl)
+            print(f'Calculated roll start point S: {S}')
             print(f'Calculated roll goal point G: {G}')
 
             # Calculate the angle of the direction S -> G
             # No need to use arctan2 due to symmetry
-            yaw_SG = np.arctan((G['y'] - S['y']) / (G['x'] - S['x']))
+            yaw_SG = np.arctan((G[1] - S[1]) / (G[0] - S[0]))
             print(f'Calculated the angle of the direction S -> G: {yaw_SG * 180 / np.pi}')
 
             if not args.disable_robot:
 
                 # Move to AboveBeforePose
-                bot.arm.set_ee_pose_components(x=S['x'], y=S['y'], z=S['z'] + args.z_above, pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SG)
 
                 # Move to TouchPose
-                bot.arm.set_ee_pose_components(x=S['x'], y=S['y'], z=S['z'], pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SG)
 
                 # Perform roll to point G
-                bot.arm.set_ee_pose_components(x=G['x'], y=G['y'], z=G['z'], pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=G[0], y=G[1], z=G[2], pitch=np.pi/2, yaw=yaw_SG)
 
                 # Move to AboveAfterPose
-                bot.arm.set_ee_pose_components(x=G['x'], y=G['y'], z=G['z'] + args.z_above, pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=G[0], y=G[1], z=G[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SG)
 
                 # Move to ReadyPose
                 go_to_ready_pose()
