@@ -87,12 +87,15 @@ def calculate_iou(target_shape):
     return np.sum(intersection) / np.sum(union)
 
 
-def calculate_geometric_center(pts):
-    return np.mean(pts, axis=0)[0].astype(int)
+def calculate_centroid(contour):
+    M = cv2.moments(contour)
+    if M['m00'] == 0:
+        raise ValueError('Failed to calculate the centroid of the current dough shape!')
+    return int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
 
 
 def image2robot_coords(pts):
-    # Calculate transform parameters from two points 
+    # Calculated transform parameters from two points 
     # Ix1, Iy1 = 320, 323
     # Ix2, Iy2 = 384, 326
     # Rx1, Ry1 = 0.0772, 0.0322
@@ -152,7 +155,7 @@ def calculate_roll_start_and_goal(method, target_shape, pcl):
     if pcl_clusters_detected:
         S = pcl_clusters[0]['position']
     else:
-        S = (*calculate_geometric_center(current_shape_contour), 0.01)
+        S = (*calculate_centroid(current_shape_contour), 0.01)
 
     # Calculate roll goal point G
     G = None
