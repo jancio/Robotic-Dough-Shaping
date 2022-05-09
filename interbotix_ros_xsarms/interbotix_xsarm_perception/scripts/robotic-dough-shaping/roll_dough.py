@@ -22,30 +22,78 @@ from interbotix_xs_modules.arm import InterbotixManipulatorXS
 from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 
 
-# In pixels
+WINDOW_TITLE = 'Robotic Dough Shaping'
 IMG_SHAPE = (480, 640)
-MIN_TARGET_CIRCLE_RADIUS = 50
-MAX_TARGET_CIRCLE_RADIUS = 180
-# Region of interest
+# Region of interest (in pixels)
 # Note: x and y is swapped in array representation as compared to cv2 image visualization representation!
-# Here x and y are in the cv2 image visualization representation
-# (0,0) is in the top left corner
+# Here x and y are in the cv2 image visualization representation and (0,0) is in the top left corner
 ROI = {
     'x_min': 170,
     'y_min': 0,
     'x_max': 540,
     'y_max': 320
 }
+# Target shape detection parameters
+MIN_TARGET_CIRCLE_RADIUS = 50
+MAX_TARGET_CIRCLE_RADIUS = 180
+# Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000
-WINDOW_TITLE = 'Robotic Dough Shaping'
+
+
+def rgb_img_callback(ros_msg):
+    global rgb_img
+    rgb_img = cv2.imdecode(np.fromstring(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
 
 
 def get_ROI_img(img):
     return img[ROI['y_min']:ROI['y_max'], ROI['x_min']:ROI['x_max']]
 
 
-def get_current_shape():
+def capture_target_shape(debug_vision):
+    if not rgb_img or rgb_img.shape != (*IMG_SHAPE, 3):
+        raise ValueError(f'No valid RGB image data received from camera!')
+
+    # Detect circle
+    gray_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2GRAY)
+    ROI_gray_img = get_ROI_img(gray_img)
+    circles = cv2.HoughCircles(ROI_gray_img, 
+                               method=cv2.HOUGH_GRADIENT, 
+                               dp=1, 
+                               minDist=MAX_TARGET_CIRCLE_RADIUS,
+                               param1=50,
+                               param2=50,
+                               minRadius=MIN_TARGET_CIRCLE_RADIUS,
+                               maxRadius=MAX_TARGET_CIRCLE_RADIUS)
+    if circles is None:
+        raise ValueError(f'Failed to detect circular target shape!')
+    if len(largest_circle) > 1:
+        print(f'Warning: multiple circles detected when capturing target shape! Taking the largest one.')
+
+    # Take the largest circle
+    largest_circle = sorted(circles[0], key=lambda c: c[2])[-1]
+    largest_circle = np.round(largest_circle).astype("int")
+
+    # Undo ROI transform
+    x = largest_circle[0] + ROI['x_min']
+    y = largest_circle[1] + ROI['y_min']
+    r = largest_circle[2]
+
+    if debug_vision:
+        debug_img = rgb_img.copy()
+        cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
+        cv2.imshow(WINDOW_TITLE, debug_img)
+
+    return {
+        'type': 'circle',
+        'params': {
+            'center': (x, y),
+            'radius': r
+        }
+    }
+
+
+def capture_current_shape():
     ROI_rgb_img = get_ROI_img(rgb_img)
 
     # Color filter
@@ -70,44 +118,11 @@ def get_current_shape():
     return current_shape_contour
 
 
-def calculate_iou(target_shape):
-    # Calculate target shape mask
-    target_shape_mask = np.zeros(IMG_SHAPE)
-    if target_shape['type'] != 'circle':
-        raise ValueError(f'Unknown target shape {target_shape["type"]}')
-    cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
-
-    # Calculate current shape mask
-    current_shape_mask = np.zeros(IMG_SHAPE)
-    # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
-    cv2.fillPoly(current_shape_mask, [get_current_shape()], color=255)
-
-    # Calculate intersection over union
-    intersection = cv2.bitwise_and(current_shape_mask, target_shape_mask)
-    union = cv2.bitwise_or(current_shape_mask, target_shape_mask)
-    return np.sum(intersection) / np.sum(union)
-
-
 def calculate_centroid(contour):
     M = cv2.moments(contour)
     if M['m00'] == 0:
         raise ValueError('Failed to calculate the centroid of the current dough shape!')
     return int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
-
-
-def image2robot_coords(pts):
-    # Calculated transform parameters from two points 
-    # Ix1, Iy1 = 320, 323
-    # Ix2, Iy2 = 384, 326
-    # Rx1, Ry1 = 0.0772, 0.0322
-    # Rx2, Ry2 = 0.0756, -0.0306
-    # A = (Rx2 - Rx1) / (Ix2 - Ix1)
-    # B = Rx1 - A*Ix1
-    # C = (Ry2 - Ry1) / (Iy2 - Iy1)
-    # D = Ry1 - C*Iy1
-    # print(f'{A}, {B}, {C}, {D}')
-    A, B, C, D = -2.5000000000000066e-05, 0.08520000000000003, -0.02093333333333333, 0.04027500000000002
-    return [ (A*x + B, C*y + D) for x, y in pts ]
 
 
 def calculate_circle_line_intersection(cc, r, p1, p2):
@@ -148,8 +163,23 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         return intersection + cc
 
 
+def image2robot_coords(pts):
+    # Calculated transform parameters from two points 
+    # Ix1, Iy1 = 320, 323
+    # Ix2, Iy2 = 384, 326
+    # Rx1, Ry1 = 0.0772, 0.0322
+    # Rx2, Ry2 = 0.0756, -0.0306
+    # A = (Rx2 - Rx1) / (Ix2 - Ix1)
+    # B = Rx1 - A*Ix1
+    # C = (Ry2 - Ry1) / (Iy2 - Iy1)
+    # D = Ry1 - C*Iy1
+    # print(f'{A}, {B}, {C}, {D}')
+    A, B, C, D = -2.5000000000000066e-05, 0.08520000000000003, -0.02093333333333333, 0.04027500000000002
+    return [ (A*x + B, C*y + D) for x, y in pts ]
+
+
 def calculate_roll_start_and_goal(method, target_shape, pcl, debug_vision):
-    current_shape_contour = get_current_shape()
+    current_shape_contour = capture_current_shape()
 
     # Calculate roll start point S
     pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
@@ -198,52 +228,22 @@ def calculate_roll_start_and_goal(method, target_shape, pcl, debug_vision):
     return S, G
 
 
-def capture_target_shape(debug_vision):
-    if not rgb_img or rgb_img.shape != (*IMG_SHAPE, 3):
-        raise ValueError(f'No valid RGB image data received from camera!')
+def calculate_iou(target_shape):
+    # Calculate target shape mask
+    target_shape_mask = np.zeros(IMG_SHAPE)
+    if target_shape['type'] != 'circle':
+        raise ValueError(f'Unknown target shape {target_shape["type"]}')
+    cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
-    # Detect circle
-    gray_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2GRAY)
-    ROI_gray_img = get_ROI_img(gray_img)
-    circles = cv2.HoughCircles(ROI_gray_img, 
-                               method=cv2.HOUGH_GRADIENT, 
-                               dp=1, 
-                               minDist=MAX_TARGET_CIRCLE_RADIUS,
-                               param1=50,
-                               param2=50,
-                               minRadius=MIN_TARGET_CIRCLE_RADIUS,
-                               maxRadius=MAX_TARGET_CIRCLE_RADIUS)
-    if circles is None:
-        raise ValueError(f'Failed to detect circular target shape!')
-    if len(largest_circle) > 1:
-        print(f'Warning: multiple circles detected when capturing target shape! Taking the largest one.')
+    # Calculate current shape mask
+    current_shape_mask = np.zeros(IMG_SHAPE)
+    # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
+    cv2.fillPoly(current_shape_mask, [capture_current_shape()], color=255)
 
-    # Take the largest circle
-    largest_circle = sorted(circles[0], key=lambda c: c[2])[-1]
-    largest_circle = np.round(largest_circle).astype("int")
-
-    # Undo ROI transform
-    x = largest_circle[0] + ROI['x_min']
-    y = largest_circle[1] + ROI['y_min']
-    r = largest_circle[2]
-
-    if debug_vision:
-        debug_img = rgb_img.copy()
-        cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
-        cv2.imshow(WINDOW_TITLE, debug_img)
-
-    return {
-        'type': 'circle',
-        'params': {
-            'center': (x, y),
-            'radius': r
-        }
-    }
-
-
-def rgb_img_callback(ros_msg):
-    global rgb_img
-    rgb_img = cv2.imdecode(np.fromstring(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
+    # Calculate intersection over union
+    intersection = cv2.bitwise_and(current_shape_mask, target_shape_mask)
+    union = cv2.bitwise_or(current_shape_mask, target_shape_mask)
+    return np.sum(intersection) / np.sum(union)
 
 
 def main():
