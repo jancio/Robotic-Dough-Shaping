@@ -118,7 +118,7 @@ def capture_current_shape():
     return current_shape_contour
 
 
-def calculate_centroid(contour):
+def calculate_centroid_2d(contour):
     M = cv2.moments(contour)
     if M['m00'] == 0:
         raise ValueError('Failed to calculate the centroid of the current dough shape!')
@@ -127,7 +127,7 @@ def calculate_centroid(contour):
 
 def calculate_circle_line_intersection(cc, r, p1, p2):
     # Args: circle center, circle radius, 
-    #       line point 1 (start point), line point 2 (candidate goal point on dough boundary)
+    #       line point 1 (roll start point), line point 2 (candidate end point on dough boundary)
     # Points must be numpy arrays
 
     # Translate to origin
@@ -178,34 +178,44 @@ def image2robot_coords(pts):
     return [ (A*x + B, C*y + D) for x, y in pts ]
 
 
-def calculate_roll_start_and_goal(method, target_shape, pcl, debug_vision):
+def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
+    # Calculate the roll start point S (in 2D)
     current_shape_contour = capture_current_shape()
+    # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
+    # if pcl_clusters_detected:
+    #     S = pcl_clusters[0]['position']
+    # else:
+    #     S = (*calculate_centroid_2d(current_shape_contour), 0.01)
+    if start_method == 'centroid-2d':
+        S = calculate_centroid_2d(current_shape_contour)
+        
+    elif start_method == 'centroid-3d':
+        #TODO: take point cloud data, filter out by ROI, and then take average
+        assert False
 
-    # Calculate roll start point S
-    pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
-    if pcl_clusters_detected:
-        S = pcl_clusters[0]['position']
-    else:
-        S = (*calculate_centroid(current_shape_contour), 0.01)
+    elif start_method == 'highest-point':
+        #TODO: take point cloud data, filter out by ROI, and then sort by height
+        assert False
 
-    # Calculate roll goal point G
-    G = None
+    # Calculate the roll end point E (in 2D)
+    E = None
     C = np.array(target_shape['params']['center'])
     R = target_shape['params']['radius']
+    # Find the largest gap between the current and target dough shape
+    max_gap = 0
+    for P in current_shape_contour[:, 0]:
+        intersection = calculate_circle_line_intersection(C, R, S, P)
+        if intersection is not None:
+            gap = np.linalg.norm(P - intersection)
+            if gap > max_gap:
+                max_gap = gap
+                if end_method == 'current':
+                    E = P
+                elif end_method == 'target':
+                    E = intersection
 
-    if method == 'basic':
-        # Find the largest gap between the current and target dough shape
-        max_gap = 0
-        for P in current_shape_contour[:, 0]:
-            intersection = calculate_circle_line_intersection(C, R, S[:2], P)
-            if intersection is not None:
-                gap = np.linalg.norm(P - intersection)
-                if gap > max_gap:
-                    max_gap = gap
-                    G = P
-
-    if G is None:
-        raise ValueError(f'No suitable goal point G found!')
+    if E is None:
+        raise ValueError(f'No suitable roll end point E found!')
 
     if debug_vision:
         debug_img = rgb_img.copy()
@@ -218,14 +228,21 @@ def calculate_roll_start_and_goal(method, target_shape, pcl, debug_vision):
         cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
         cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
         # Draw the planned roll path
-        cv2.arrowedLine(debug_img, S[:2], G, color=(0, 0, 255), thickness=2)
+        cv2.arrowedLine(debug_img, S, E, color=(0, 0, 255), thickness=2)
         cv2.imshow(WINDOW_TITLE, debug_img)
 
     # Transform from image to robot coordinates
-    G = image2robot_coords(G)
-    # For now, the goal point has the same z location as the start point
-    G = (G[0], G[1], S[2])
-    return S, G
+    S = image2robot_coords(S)
+    E = image2robot_coords(E)
+
+    # Calculate the z coordinates
+    #TODO: get height at point S from point cloud
+    z = 0.01
+    # For now, the end point has the same z location as the start point
+    S = (S[0], S[1], z)
+    E = (E[0], E[1], z)
+
+    return S, E
 
 
 def calculate_iou(target_shape):
@@ -252,8 +269,11 @@ def main():
     #########################
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--method', type=str, default='basic', help='Choose the method from: "basic", ...')
-    parser.add_argument('-tc', '--termination-condition', type=str, default='time', help='Choose either "time" or "iou" termination condition.')
+    parser.add_argument('-sm', '--start-method', type=str, default='centroid-2d', choices=['centroid-2d', 'centroid-3d', 'highest-point'],
+                        help='Choose the roll start point calculation method from: "centroid-2d", "centroid-3d", and "highest-point"')
+    parser.add_argument('-em', '--end-method', type=str, default='current', choices=['current', 'target'],
+                        help='Choose the roll end point calculation method from: "current" (current shape outline), "target" (target shape outline)')
+    parser.add_argument('-tc', '--termination-condition', type=str, default='time', choices=['time', 'iou'], help='Choose either "time" or "iou" termination condition.')
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
     parser.add_argument('-ld', '--log-dir', type=str, default='~/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping/roll_dough.py /logs', help='Path to directory where to save logs.') 
     parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Vertical distance above the dough immediately before and after rolling.')
@@ -296,7 +316,7 @@ def main():
     if not os.path.isdir(args.log_dir):
         os.makedirs(args.log_dir)
 
-    log_filename = f'log_{args.termination_condition}_{args.termination_value}_{args.method}_{datetime.now().strftime("%Y%m%d-%H%M%S-%f")}'
+    log_filename = f'log_{args.termination_condition}_{args.termination_value}_{args.start_method}_{args.end_method}_{datetime.now().strftime("%Y%m%d-%H%M%S-%f")}'
     with open(f'{args.log_dir}/{log_filename}.csv', 'w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
 
@@ -322,7 +342,7 @@ def main():
         # Logging
         time_elapsed = time() - start_time
         print('=' * 120)
-        print(json.dumps(vars(args), indent=2))
+        print(json.dumps(params, indent=2))
         print(f'Preparation: \t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
         print('=' * 120)
         # First line is a dictionary of parameters
@@ -337,29 +357,29 @@ def main():
         iteration = 1
         while not terminate(time() - start_time, iou):
 
-            # Calculate the roll start point S and roll goal point G
-            S, G = calculate_roll_start_and_goal(args.method, target_shape, pcl, args.debug_vision)
+            # Calculate the roll start point S and roll end point E
+            S, E = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, pcl, args.debug_vision)
             print(f'Calculated roll start point S: {S}')
-            print(f'Calculated roll goal point G: {G}')
+            print(f'Calculated roll end point E: {E}')
 
-            # Calculate the angle of the direction S -> G
+            # Calculate the angle of the direction S -> E
             # No need to use arctan2 due to symmetry
-            yaw_SG = np.arctan((G[1] - S[1]) / (G[0] - S[0]))
-            print(f'Calculated the angle of the direction S -> G: {yaw_SG * 180 / np.pi}')
+            yaw_SE = np.arctan((E[1] - S[1]) / (E[0] - S[0]))
+            print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi}')
 
             if not args.disable_robot:
 
                 # Move to AboveBeforePose
-                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SE)
 
                 # Move to TouchPose
-                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SE)
 
-                # Perform roll to point G
-                bot.arm.set_ee_pose_components(x=G[0], y=G[1], z=G[2], pitch=np.pi/2, yaw=yaw_SG)
+                # Perform roll to point E
+                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2], pitch=np.pi/2, yaw=yaw_SE)
 
                 # Move to AboveAfterPose
-                bot.arm.set_ee_pose_components(x=G[0], y=G[1], z=G[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SG)
+                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SE)
 
                 # Move to ReadyPose
                 go_to_ready_pose()
