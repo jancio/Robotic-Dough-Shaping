@@ -40,10 +40,12 @@ MAX_TARGET_CIRCLE_RADIUS = 180
 MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000
 
+RGB_IMG = None
+
 
 def rgb_img_callback(ros_msg):
-    global rgb_img
-    rgb_img = cv2.imdecode(np.fromstring(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
+    global RGB_IMG
+    RGB_IMG = cv2.imdecode(np.fromstring(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
 
 
 def get_ROI_img(img):
@@ -51,11 +53,11 @@ def get_ROI_img(img):
 
 
 def capture_target_shape(debug_vision):
-    if not rgb_img or rgb_img.shape != (*IMG_SHAPE, 3):
+    if type(RGB_IMG) != np.ndarray or RGB_IMG.shape != (*IMG_SHAPE, 3):
         raise ValueError(f'No valid RGB image data received from camera!')
 
     # Detect circle
-    gray_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2GRAY)
+    gray_img = cv2.cvtColor(RGB_IMG, cv2.COLOR_BGR2GRAY)
     ROI_gray_img = get_ROI_img(gray_img)
     circles = cv2.HoughCircles(ROI_gray_img, 
                                method=cv2.HOUGH_GRADIENT, 
@@ -67,7 +69,7 @@ def capture_target_shape(debug_vision):
                                maxRadius=MAX_TARGET_CIRCLE_RADIUS)
     if circles is None:
         raise ValueError(f'Failed to detect circular target shape!')
-    if len(largest_circle) > 1:
+    if len(circles[0]) > 1:
         print(f'Warning: multiple circles detected when capturing target shape! Taking the largest one.')
 
     # Take the largest circle
@@ -80,9 +82,10 @@ def capture_target_shape(debug_vision):
     r = largest_circle[2]
 
     if debug_vision:
-        debug_img = rgb_img.copy()
+        debug_img = RGB_IMG.copy()
         cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
         cv2.imshow(WINDOW_TITLE, debug_img)
+        cv2.waitKey(0)
 
     return {
         'type': 'circle',
@@ -94,7 +97,7 @@ def capture_target_shape(debug_vision):
 
 
 def capture_current_shape():
-    ROI_rgb_img = get_ROI_img(rgb_img)
+    ROI_rgb_img = get_ROI_img(RGB_IMG)
 
     # Color filter
     color_mask = np.zeros((*ROI_rgb_img.shape[:2], 3)).astype('uint8')
@@ -218,18 +221,19 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         raise ValueError(f'No suitable roll end point E found!')
 
     if debug_vision:
-        debug_img = rgb_img.copy()
+        debug_img = RGB_IMG.copy()
         # Draw the target shape
         cv2.circle(debug_img, C, R, color=(0, 0, 255), thickness=1)
         # Draw the current shape
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
         # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
-        overlay = rgb_img.copy()
+        overlay = RGB_IMG.copy()
         cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
         cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
         # Draw the planned roll path
         cv2.arrowedLine(debug_img, S, E, color=(0, 0, 255), thickness=2)
         cv2.imshow(WINDOW_TITLE, debug_img)
+        cv2.waitKey(0)
 
     # Transform from image to robot coordinates
     S = image2robot_coords(S)
@@ -275,7 +279,7 @@ def main():
                         help='Choose the roll end point calculation method from: "current" (current shape outline), "target" (target shape outline)')
     parser.add_argument('-tc', '--termination-condition', type=str, default='time', choices=['time', 'iou'], help='Choose either "time" or "iou" termination condition.')
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
-    parser.add_argument('-ld', '--log-dir', type=str, default='~/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping/roll_dough.py /logs', help='Path to directory where to save logs.') 
+    parser.add_argument('-ld', '--log-dir', type=str, default='/home/RoboG1/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping/logs', help='Path to directory where to save logs.') 
     parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Vertical distance above the dough immediately before and after rolling.')
     parser.add_argument('-dr', '--disable-robot', type=bool, default=False, help='Will not send any commands to the robot when set to True.')
     parser.add_argument('-dv', '--debug-vision', type=bool, default=False, help='Show vision output when set to True.')
@@ -292,6 +296,15 @@ def main():
         raise ValueError(f'Unknown termination condition {args.termination_condition}')
 
     #########################
+    # Initialize vision
+    #########################
+    
+    pcl = InterbotixPointCloudInterface()
+    rospy.Subscriber("/camera/color/image_raw/compressed", CompressedImage, rgb_img_callback,  queue_size=1)
+    # Do not initialize ROS node here, as this is done in InterbotixManipulatorXS (node name /wx250s_robot_manipulation)
+    # rospy.init_node('roll_dough', anonymous=True)
+    
+    #########################
     # Initialize robot
     #########################
 
@@ -299,15 +312,6 @@ def main():
 
     def go_to_ready_pose():
         bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=np.pi/2)
-
-
-    #########################
-    # Initialize vision
-    #########################
-        
-    pcl = InterbotixPointCloudInterface()
-    rospy.init_node('roll_dough', anonymous=True)
-    rospy.Subscriber("/camera/color/image_raw/compressed", CompressedImage, rgb_img_callback,  queue_size=1)
 
     #########################
     # Setup logging
