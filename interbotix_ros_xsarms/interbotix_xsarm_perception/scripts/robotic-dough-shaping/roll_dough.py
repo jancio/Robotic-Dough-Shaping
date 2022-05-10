@@ -281,7 +281,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
         # Draw the target shape
-        cv2.circle(debug_img, C, R, color=(0, 0, 255), thickness=1)
+        cv2.circle(debug_img, tuple(C), R, color=(0, 0, 255), thickness=1)
         # Draw the current shape
         overlay = RGB_IMG.copy()
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
@@ -289,7 +289,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
         cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
         # Draw the planned roll path
-        cv2.arrowedLine(debug_img, S, E, color=(0, 0, 255), thickness=2)
+        cv2.arrowedLine(debug_img, tuple(S), tuple(E), color=(0, 0, 255), thickness=1)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Roll trajectory', debug_img)
         cv2.waitKey(0)
 
@@ -444,6 +444,7 @@ def main():
             # No need to use arctan2 due to symmetry
             yaw_SE = np.arctan((E[1] - S[1]) / (E[0] - S[0]))
             print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi}')
+            return
 
             if not args.disable_robot:
 
