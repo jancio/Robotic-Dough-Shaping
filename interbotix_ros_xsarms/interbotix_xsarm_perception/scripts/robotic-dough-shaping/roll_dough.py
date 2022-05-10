@@ -26,7 +26,7 @@ from interbotix_xs_modules.arm import InterbotixManipulatorXS
 from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 
 
-WINDOW_TITLE = 'Robotic Dough Shaping'
+WINDOW_TITLE_PREFIX = 'Robotic Dough Shaping - '
 IMG_SHAPE = (480, 640)
 # Region of interest (in pixels)
 # Note: x and y is swapped in array representation as compared to cv2 image visualization representation!
@@ -99,7 +99,7 @@ def capture_target_shape(debug_vision):
     if debug_vision:
         debug_img = RGB_IMG.copy()
         cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
-        cv2.imshow(WINDOW_TITLE, debug_img)
+        cv2.imshow(WINDOW_TITLE_PREFIX + 'Target shape', debug_img)
         cv2.waitKey(0)
 
     return {
@@ -111,7 +111,7 @@ def capture_target_shape(debug_vision):
     }
 
 
-def capture_current_shape():
+def capture_current_shape(debug_vision):
     ROI_rgb_img = get_ROI_img(RGB_IMG)
 
     # Color filter
@@ -133,6 +133,18 @@ def capture_current_shape():
 
     # Undo ROI transform
     current_shape_contour[:, 0] += np.array([ROI['x_min'], ROI['y_min']])
+
+    if debug_vision:
+        debug_img = RGB_IMG.copy()
+        # Draw the current shape
+        overlay = RGB_IMG.copy()
+        # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
+        # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
+        cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
+        cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
+        cv2.imshow(WINDOW_TITLE_PREFIX + 'Current dough shape', debug_img)
+        cv2.waitKey(0)
+    
     return current_shape_contour
 
 
@@ -221,7 +233,7 @@ def get_dough_height(pt):
 
 def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
     # Calculate the roll start point S (in 2D)
-    current_shape_contour = capture_current_shape()
+    current_shape_contour = capture_current_shape(debug_vision)
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
@@ -263,14 +275,14 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         # Draw the target shape
         cv2.circle(debug_img, C, R, color=(0, 0, 255), thickness=1)
         # Draw the current shape
+        overlay = RGB_IMG.copy()
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
         # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
-        overlay = RGB_IMG.copy()
         cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
         cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
         # Draw the planned roll path
         cv2.arrowedLine(debug_img, S, E, color=(0, 0, 255), thickness=2)
-        cv2.imshow(WINDOW_TITLE, debug_img)
+        cv2.imshow(WINDOW_TITLE_PREFIX + 'Roll trajectory', debug_img)
         cv2.waitKey(0)
 
     # Transform from image to robot coordinates
@@ -286,17 +298,27 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     return S, E
 
 
-def calculate_iou(target_shape):
+def calculate_iou(target_shape, debug_vision):
     # Calculate target shape mask
-    target_shape_mask = np.zeros(IMG_SHAPE)
+    target_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     if target_shape['type'] != 'circle':
         raise ValueError(f'Unknown target shape {target_shape["type"]}')
     cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
     # Calculate current shape mask
-    current_shape_mask = np.zeros(IMG_SHAPE)
+    current_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
-    cv2.fillPoly(current_shape_mask, [capture_current_shape()], color=255)
+    cv2.fillPoly(current_shape_mask, [capture_current_shape(debug_vision)], color=255)
+
+    if debug_vision:
+        debug_img = RGB_IMG.copy()
+        # Draw the target shape
+        cv2.circle(debug_img, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=(0, 0, 255), thickness=1)
+        # Draw the current shape
+        overlay = cv2.bitwise_and(debug_img, debug_img, mask=cv2.bitwise_not(current_shape_mask))
+        cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
+        cv2.imshow(WINDOW_TITLE_PREFIX + 'Intersection over union', debug_img)
+        cv2.waitKey(0)
 
     # Calculate intersection over union
     intersection = cv2.bitwise_and(current_shape_mask, target_shape_mask)
@@ -379,7 +401,7 @@ def main():
         params.update(target_shape)
 
         # Calculate current IoU
-        iou = calculate_iou(target_shape)
+        iou = calculate_iou(target_shape, args.debug_vision)
 
         # Logging
         time_elapsed = time() - start_time
@@ -427,7 +449,7 @@ def main():
                 go_to_ready_pose()
 
             # Calculate current IoU
-            iou = calculate_iou(target_shape)
+            iou = calculate_iou(target_shape, args.debug_vision)
 
             # Logging
             time_elapsed = time() - start_time
