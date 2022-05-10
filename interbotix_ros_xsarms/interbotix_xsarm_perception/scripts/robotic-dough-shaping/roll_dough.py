@@ -14,9 +14,13 @@ import argparse
 import numpy as np
 from time import time
 from datetime import datetime
+from types import GeneratorType
 
 import rospy
 from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import PointCloud2
+from sensor_msgs import point_cloud2
+from sklearn.neighbors import KDTree
 
 from interbotix_xs_modules.arm import InterbotixManipulatorXS
 from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
@@ -39,13 +43,24 @@ MAX_TARGET_CIRCLE_RADIUS = 180
 # Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000
+# Fraction of dough height reached at the roll start point
+DOUGH_HEIGHT_CONTRACTION_RATIO = 0.5
+# In meters
+# Z_OFFSET = 0.61
 
 RGB_IMG = None
+POINT_CLOUD = None
 
 
 def rgb_img_callback(ros_msg):
     global RGB_IMG
     RGB_IMG = cv2.imdecode(np.fromstring(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
+
+
+def point_cloud_callback(ros_msg):
+    # Generator
+    global POINT_CLOUD
+    POINT_CLOUD = point_cloud2.read_points(ros_msg, skip_nans=True, field_names=('x', 'y', 'z'))
 
 
 def get_ROI_img(img):
@@ -166,7 +181,7 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         return intersection + cc
 
 
-def image2robot_coords(pts):
+def image2robot_coords(pt):
     # Calculated transform parameters from two points 
     # Ix1, Iy1 = 320, 323
     # Ix2, Iy2 = 384, 326
@@ -177,8 +192,31 @@ def image2robot_coords(pts):
     # C = (Ry2 - Ry1) / (Iy2 - Iy1)
     # D = Ry1 - C*Iy1
     # print(f'{A}, {B}, {C}, {D}')
-    A, B, C, D = -2.5000000000000066e-05, 0.08520000000000003, -0.02093333333333333, 0.04027500000000002
-    return [ (A*x + B, C*y + D) for x, y in pts ]
+    A, B = -2.5000000000000066e-05, 0.08520000000000003
+    C, D = -0.02093333333333333, 0.04027500000000002
+    return (A*pt[0] + B, C*pt[1] + D)
+
+
+def image2pointcloud_coords(pt):
+    A, B = 0.0009652963665596975, -0.32951992162237304
+    C, D = 0.0009512554830209385, -0.22369287797508308
+    return (A*pt[0] + B, C*pt[1] + D)
+
+
+def get_dough_height(pt):
+    # Transform to point cloud coordinates
+    pc_pt = image2pointcloud_coords(pt)
+
+    if type(POINT_CLOUD) == GeneratorType:
+        raise ValueError(f'No valid point cloud data received from camera!')
+    
+    # Find k closest points in the point cloud (in terms of x and y) and get their average distance from camera
+    point_cloud_list = list(POINT_CLOUD)
+    _, idx = KDTree(point_cloud_list[:, :2]).query([pc_pt], k=3)
+    depth = np.mean(point_cloud_list[idx][0, :, 2])
+
+    max_depth = max(point_cloud_list[:, 2])
+    return max_depth - depth
 
 
 def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
@@ -239,9 +277,8 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     S = image2robot_coords(S)
     E = image2robot_coords(E)
 
-    # Calculate the z coordinates
-    #TODO: get height at point S from point cloud
-    z = 0.01
+    # Calculate the z coordinates of the points S and E
+    z = DOUGH_HEIGHT_CONTRACTION_RATIO * get_dough_height(S)
     # For now, the end point has the same z location as the start point
     S = (S[0], S[1], z)
     E = (E[0], E[1], z)
@@ -301,6 +338,7 @@ def main():
     
     pcl = InterbotixPointCloudInterface()
     rospy.Subscriber("/camera/color/image_raw/compressed", CompressedImage, rgb_img_callback,  queue_size=1)
+    rospy.Subscriber('/pc_filter/pointcloud/filtered', PointCloud2, point_cloud_callback, queue_size=1)
     # Do not initialize ROS node here, as this is done in InterbotixManipulatorXS (node name /wx250s_robot_manipulation)
     # rospy.init_node('roll_dough', anonymous=True)
     
