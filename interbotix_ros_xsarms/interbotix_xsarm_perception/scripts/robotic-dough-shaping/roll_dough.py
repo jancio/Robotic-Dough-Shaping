@@ -38,6 +38,7 @@ ROI = {
     'y_max': 320
 }
 # Target shape detection parameters
+# Only circles with diameters 4 inch or more will be detected
 MIN_TARGET_CIRCLE_RADIUS = 50
 MAX_TARGET_CIRCLE_RADIUS = 180
 # Current shape detection parameters
@@ -98,6 +99,8 @@ def capture_target_shape(debug_vision):
 
     if debug_vision:
         debug_img = RGB_IMG.copy()
+        # Draw the region of interest
+        cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
         cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Target shape', debug_img)
         cv2.waitKey(0)
@@ -136,6 +139,8 @@ def capture_current_shape(debug_vision):
 
     if debug_vision:
         debug_img = RGB_IMG.copy()
+        # Draw the region of interest
+        cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
         # Draw the current shape
         overlay = RGB_IMG.copy()
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
@@ -272,6 +277,8 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
 
     if debug_vision:
         debug_img = RGB_IMG.copy()
+        # Draw the region of interest
+        cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
         # Draw the target shape
         cv2.circle(debug_img, C, R, color=(0, 0, 255), thickness=1)
         # Draw the current shape
@@ -312,6 +319,8 @@ def calculate_iou(target_shape, debug_vision):
 
     if debug_vision:
         debug_img = RGB_IMG.copy()
+        # Draw the region of interest
+        cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
         # Draw the target shape
         cv2.circle(debug_img, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=(0, 0, 255), thickness=1)
         # Draw the current shape
