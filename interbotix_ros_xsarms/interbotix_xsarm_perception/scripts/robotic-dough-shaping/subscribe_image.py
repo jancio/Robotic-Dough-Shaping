@@ -57,11 +57,12 @@ class image_feature:
         np_arr = np.fromstring(ros_data.data, np.uint8)
         # image_np = cv2.imdecode(np_arr, cv2.CV_LOAD_IMAGE_COLOR)
         image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) # OpenCV >= 3.0:
-        image_np_copy = image_np.copy()
-        np.save('d8_23.npy', image_np_copy)
+        image_np_copy = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+        np.save('./janko/d8.npy', image_np_copy)
         image_copy = Image.fromarray(image_np_copy)
-        image_copy.save('d8_23.png')
+        image_copy.save('./janko/d8.png')
         print('saved!')
+        return
 
         # bounding box
         top_left = (250,40)
