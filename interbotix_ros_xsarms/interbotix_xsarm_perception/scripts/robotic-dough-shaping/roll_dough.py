@@ -90,12 +90,12 @@ def capture_target_shape(debug_vision):
 
     # Take the largest circle
     largest_circle = sorted(circles[0], key=lambda c: c[2])[-1]
-    largest_circle = np.round(largest_circle).astype("int")
+    largest_circle = np.round(largest_circle)
 
     # Undo ROI transform
-    x = largest_circle[0] + ROI['x_min']
-    y = largest_circle[1] + ROI['y_min']
-    r = largest_circle[2]
+    x = int(largest_circle[0]) + ROI['x_min']
+    y = int(largest_circle[1]) + ROI['y_min']
+    r = int(largest_circle[2])
 
     if debug_vision:
         debug_img = RGB_IMG.copy()
@@ -145,8 +145,9 @@ def capture_current_shape(debug_vision):
         overlay = RGB_IMG.copy()
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
         # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
-        cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
-        cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
+        cv2.fillPoly(overlay, [current_shape_contour], color=(255, 0, 0))
+        alpha = 0.2
+        cv2.addWeighted(overlay, alpha, debug_img, 1 - alpha, 0, debug_img)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Current dough shape', debug_img)
         cv2.waitKey(0)
     
@@ -313,9 +314,10 @@ def calculate_iou(target_shape, debug_vision):
     cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
     # Calculate current shape mask
+    current_shape_contour = capture_current_shape(debug_vision)
     current_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
-    cv2.fillPoly(current_shape_mask, [capture_current_shape(debug_vision)], color=255)
+    cv2.fillPoly(current_shape_mask, [current_shape_contour], color=255)
 
     if debug_vision:
         debug_img = RGB_IMG.copy()
@@ -324,8 +326,11 @@ def calculate_iou(target_shape, debug_vision):
         # Draw the target shape
         cv2.circle(debug_img, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=(0, 0, 255), thickness=1)
         # Draw the current shape
-        overlay = cv2.bitwise_and(debug_img, debug_img, mask=cv2.bitwise_not(current_shape_mask))
-        cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
+        overlay = RGB_IMG.copy()
+        # overlay = cv2.bitwise_and(debug_img, debug_img, mask=cv2.bitwise_not(current_shape_mask))
+        cv2.fillPoly(overlay, [current_shape_contour], color=(255, 0, 0))
+        alpha = 0.2
+        cv2.addWeighted(overlay, alpha, debug_img, 1 - alpha, 0, debug_img)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Intersection over union', debug_img)
         cv2.waitKey(0)
 
@@ -415,7 +420,7 @@ def main():
         # Logging
         time_elapsed = time() - start_time
         print('=' * 120)
-        print(json.dumps(params, indent=2))
+        print(f'Params:\n{json.dumps(params, indent=2)}')
         print(f'Preparation: \t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
         print('=' * 120)
         # First line is a dictionary of parameters
