@@ -201,8 +201,8 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         mult = np.sqrt((r*r - c*c/a2b2) / a2b2)
         i1 = np.array([x0 + b*mult, y0 - a*mult])
         i2 = np.array([x0 - b*mult, y0 + a*mult])
-        # Get intersection closer to p2 (i.e. in the direction p1->p2 of the intended roll)
-        intersection = i2 if np.linalg.norm(i1 - p2) > np.linalg.norm(i2 - p2) else i1
+        # Get the intersection in the direction p1->p2 of the intended roll
+        intersection = i1 if (i1[0] - x1) * (x2 - x1) > 0 and (i1[1] - y1) * (y2 - y1) > 0 else i2
         # Undo initial translation to origin
         return intersection + cc
 
@@ -271,8 +271,12 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     R = target_shape['params']['radius']
     # Find the largest gap between the current and target dough shape
     max_gap = 0
+    # [For debugging] Save circle-line intersection points
+    # intersection_pts = []
     for P in current_shape_contour[:, 0]:
         intersection = calculate_circle_line_intersection(C, R, S, P)
+        # [For debugging] Save circle-line intersection points
+        # intersection_pts.append(intersection.astype(int))
         if intersection is not None:
             gap = np.linalg.norm(P - intersection)
             if gap > max_gap:
@@ -280,7 +284,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
                 if end_method == 'current':
                     E = P
                 elif end_method == 'target':
-                    E = intersection
+                    E = intersection.astype(int)
 
     if E is None:
         raise ValueError(f'No suitable roll end point E found!')
@@ -295,13 +299,17 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
         # cv2.drawContours(debug_img, [current_shape_contour], color=(255, 0, 0), thickness=1)
         cv2.polylines(debug_img, [current_shape_contour], isClosed=True, color=(255, 0, 0), thickness=1)
+        # [For debugging] Draw intersection points
+        # for i in intersection_pts:
+        #     cv2.circle(debug_img, i, 2, color=(0, 255, 0), thickness=2)
         # Draw the planned roll path
-        cv2.arrowedLine(debug_img, tuple(S), tuple(E), color=(0, 0, 255), thickness=1)
+        cv2.arrowedLine(debug_img, tuple(S), tuple(E), color=(0, 0, 0), thickness=2, tipLength=0.3)
         # Draw text
-        cv2.rectangle(debug_img, (5, 5), (160, 100), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.rectangle(debug_img, (5, 5), (160, 130), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Planned roll', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Roll trajectory')
         cv2.waitKey(0)
