@@ -1,10 +1,10 @@
-######################################################################################################
+##################################################################################################################################
 # Robotic Dough Shaping - Main file
-######################################################################################################
+##################################################################################################################################
 # Instructions:
-#   First, run: roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s
+#   First, run: roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
 #   Then change to this directory and run: python3 roll_dough.py
-######################################################################################################
+##################################################################################################################################
 
 import json
 import os
@@ -13,6 +13,7 @@ import cv2
 import argparse
 import numpy as np
 from time import time
+from scipy.linalg import inv
 from datetime import datetime
 from types import GeneratorType
 
@@ -27,27 +28,39 @@ from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterfa
 
 
 WINDOW_ID = 'Robotic Dough Shaping'
-IMG_SHAPE = (480, 640)
-# Region of interest (in pixels)
+IMG_SHAPE = (480, 640) # pizels
+# Region of interest
 # Note: x and y is swapped in array representation as compared to cv2 image visualization representation!
 # Here x and y are in the cv2 image visualization representation and (0,0) is in the top left corner
 ROI = {
-    'x_min': 170,
-    'y_min': 0,
-    'x_max': 540,
-    'y_max': 320
+    'x_min': 170,   # pixels
+    'y_min': 0,     # pixels
+    'x_max': 540,   # pixels
+    'y_max': 320    # pixels
 }
 # Target shape detection parameters
 # Only circles with diameters 4 inch or more will be detected
-MIN_TARGET_CIRCLE_RADIUS = 50
-MAX_TARGET_CIRCLE_RADIUS = 180
+MIN_TARGET_CIRCLE_RADIUS = 50   # pixels
+MAX_TARGET_CIRCLE_RADIUS = 180  # pixels
 # Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
-MIN_CONTOUR_AREA = 1000
+MIN_CONTOUR_AREA = 1000 # pixels^2
 # Fraction of dough height reached at the roll start point
 DOUGH_HEIGHT_CONTRACTION_RATIO = 0.5
-# In meters
 # Z_OFFSET = 0.61
+# Minimum z value to move the robot to
+Z_MIN = 0.065 # meters
+# Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
+# r = np.dot(T_p2r, p)
+T_p2r = np.array([[ 0.08870469, -0.9955393 , -0.03213995,  0.175572  ],
+                  [-0.99605734, -0.08862224, -0.0039837 ,  0.0246511 ],
+                  [ 0.00111761,  0.03236661, -0.99947544,  0.595534  ],
+                  [ 0.        ,  0.        ,  0.        ,  1.        ]])
+# Transformation matrix: camera_color_optical_frame -> wx250s/base_link
+T_i2r = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
+                  [-0.99697964, -0.07765513, -0.00113465,  0.0391628 ],
+                  [-0.00105   ,  0.02808608, -0.99960496,  0.59613603],
+                  [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
 RGB_IMG = None
 POINT_CLOUD = None
@@ -242,8 +255,20 @@ def get_dough_height(pt):
     _, idx = KDTree(point_cloud_arr[:, :2]).query([pc_pt], k=3)
     depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
+    print(np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1])))
+
     max_depth = max(point_cloud_arr[:, 2])
+    print(f'DEPTH: {depth}, max: {max_depth}')
     return max_depth - depth
+
+    # ========================================================================================================================
+    # Real height of the middle point above the the bottom is 0.017 m
+    # [ 0.35355065  0.37057272 -0.01054889  1.        ]
+    # DEPTH: 0.5986666878064474, max: 0.6000000238418579
+    # Maximum dough height: 0.0013333360354105261
+    # Calculated roll start point S: ['0.075', '-3.958', '0.001'] m
+    # Calculated roll end point E: ['0.076', '-4.251', '0.001'] m
+    # Calculated the angle of the direction S -> E: -89.844 deg
 
 
 def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
@@ -319,7 +344,9 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     E = image2robot_coords(E)
 
     # Calculate the z coordinates of the points S and E
-    z = DOUGH_HEIGHT_CONTRACTION_RATIO * get_dough_height(S)
+    height = get_dough_height(S)
+    print(f'Maximum dough height: {height}')
+    z = DOUGH_HEIGHT_CONTRACTION_RATIO * height
     # For now, the end point has the same z location as the start point
     S = (S[0], S[1], z)
     E = (E[0], E[1], z)
@@ -412,8 +439,8 @@ def main():
 
     bot = InterbotixManipulatorXS("wx250s")#, moving_time=5, accel_time=5)
 
-    def go_to_ready_pose():
-        bot.arm.set_ee_pose_components(x=0.0567, y=0, z=0.15812, pitch=np.pi/2)
+    def go_to_ready_pose(): 
+        bot.arm.set_ee_pose_components(x=0.057, y=0, z=0.15812, pitch=np.pi/2)
 
     #########################
     # Setup logging
