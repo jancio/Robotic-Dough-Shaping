@@ -1,11 +1,12 @@
 
 # In terminal
 
-source ~/interbotix_ws/devel/setup.bash && roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s
+source ~/interbotix_ws/devel/setup.bash && roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
 
-
+#################################################
 # In vscode
 
 cd ~/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping && source ~/interbotix_ws/devel/setup.bash
 
-python3 roll_dough.py -dv True -dr True
+# Debug / test
+python3 roll_dough.py -dv True -dr True -tv 100

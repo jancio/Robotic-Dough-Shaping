@@ -231,21 +231,22 @@ def get_dough_height(pt):
     # Transform to point cloud coordinates
     pc_pt = image2pointcloud_coords(pt)
 
-    if type(POINT_CLOUD) == GeneratorType:
+    if type(POINT_CLOUD) != GeneratorType:
         raise ValueError(f'No valid point cloud data received from camera!')
     
     # Find k closest points in the point cloud (in terms of x and y) and get their average distance from camera
-    point_cloud_list = list(POINT_CLOUD)
-    _, idx = KDTree(point_cloud_list[:, :2]).query([pc_pt], k=3)
-    depth = np.mean(point_cloud_list[idx][0, :, 2])
+    # point_cloud_arr = np.fromiter(POINT_CLOUD, dtype=np.dtype(float, (3,)))
+    point_cloud_arr = np.array(list(POINT_CLOUD))
+    _, idx = KDTree(point_cloud_arr[:, :2]).query([pc_pt], k=3)
+    depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
-    max_depth = max(point_cloud_list[:, 2])
+    max_depth = max(point_cloud_arr[:, 2])
     return max_depth - depth
 
 
 def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
     # Calculate the roll start point S (in 2D)
-    current_shape_contour = capture_current_shape(debug_vision)
+    current_shape_contour = capture_current_shape(debug_vision=False)
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
@@ -323,7 +324,7 @@ def calculate_iou(target_shape, debug_vision):
     cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
     # Calculate current shape mask
-    current_shape_contour = capture_current_shape(debug_vision)
+    current_shape_contour = capture_current_shape(debug_vision=False)
     current_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
     cv2.fillPoly(current_shape_mask, [current_shape_contour], color=255)
@@ -426,7 +427,7 @@ def main():
             go_to_ready_pose()
 
         # Capture the target dough shape
-        target_shape = capture_target_shape(args.debug_vision)
+        target_shape = capture_target_shape(debug_vision=False)
         params.update(target_shape)
 
         # Calculate current IoU
@@ -452,13 +453,13 @@ def main():
 
             # Calculate the roll start point S and roll end point E
             S, E = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, pcl, args.debug_vision)
-            print(f'Calculated roll start point S: {S}')
-            print(f'Calculated roll end point E: {E}')
+            print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
+            print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
 
             # Calculate the angle of the direction S -> E
             # No need to use arctan2 due to symmetry
             yaw_SE = np.arctan((E[1] - S[1]) / (E[0] - S[0]))
-            print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi}')
+            print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f} deg')
             return
 
             if not args.disable_robot:
