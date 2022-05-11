@@ -26,7 +26,7 @@ from interbotix_xs_modules.arm import InterbotixManipulatorXS
 from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterface
 
 
-WINDOW_TITLE_PREFIX = 'Robotic Dough Shaping - '
+WINDOW_ID = 'Robotic Dough Shaping'
 IMG_SHAPE = (480, 640)
 # Region of interest (in pixels)
 # Note: x and y is swapped in array representation as compared to cv2 image visualization representation!
@@ -107,7 +107,8 @@ def capture_target_shape(debug_vision):
         cv2.rectangle(debug_img, (5, 5), (160, 70), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
-        cv2.imshow(WINDOW_TITLE_PREFIX + 'Target shape', debug_img)
+        cv2.imshow(WINDOW_ID, debug_img)
+        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Target shape')
         cv2.waitKey(0)
 
     return {
@@ -154,7 +155,8 @@ def capture_current_shape(debug_vision):
         cv2.rectangle(debug_img, (5, 5), (160, 100), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.imshow(WINDOW_TITLE_PREFIX + 'Current dough shape', debug_img)
+        cv2.imshow(WINDOW_ID, debug_img)
+        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Current dough shape')
         cv2.waitKey(0)
     
     return current_shape_contour
@@ -300,7 +302,8 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.imshow(WINDOW_TITLE_PREFIX + 'Roll trajectory', debug_img)
+        cv2.imshow(WINDOW_ID, debug_img)
+        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Roll trajectory')
         cv2.waitKey(0)
 
     # Transform from image to robot coordinates
@@ -350,7 +353,8 @@ def calculate_iou(target_shape, debug_vision):
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.imshow(WINDOW_TITLE_PREFIX + 'Intersection over union', debug_img)
+        cv2.imshow(WINDOW_ID, debug_img)
+        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Intersection over union')
         cv2.waitKey(0)
 
     return iou
