@@ -101,7 +101,12 @@ def capture_target_shape(debug_vision):
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
-        cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=2)
+        # Draw the target shape
+        cv2.circle(debug_img, (x, y), r, color=(0, 0, 255), thickness=1)
+        # Draw text
+        cv2.rectangle(debug_img, (5, 5), (160, 70), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Target shape', debug_img)
         cv2.waitKey(0)
 
@@ -142,12 +147,13 @@ def capture_current_shape(debug_vision):
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
         # Draw the current shape
-        overlay = RGB_IMG.copy()
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
-        # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
-        cv2.fillPoly(overlay, [current_shape_contour], color=(255, 0, 0))
-        alpha = 0.2
-        cv2.addWeighted(overlay, alpha, debug_img, 1 - alpha, 0, debug_img)
+        # cv2.drawContours(debug_img, [current_shape_contour], color=(255, 0, 0), thickness=1)
+        cv2.polylines(debug_img, [current_shape_contour], isClosed=True, color=(255, 0, 0), thickness=1)
+        # Draw text
+        cv2.rectangle(debug_img, (5, 5), (160, 100), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Current dough shape', debug_img)
         cv2.waitKey(0)
     
@@ -283,13 +289,16 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         # Draw the target shape
         cv2.circle(debug_img, tuple(C), R, color=(0, 0, 255), thickness=1)
         # Draw the current shape
-        overlay = RGB_IMG.copy()
         # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
-        # cv2.drawContours(debug_img, [current_shape_contour], color=(0, 0, 255), thickness=1)
-        cv2.fillPoly(overlay, [current_shape_contour], color=(0, 0, 0))
-        cv2.addWeighted(overlay, 0.4, debug_img, 1 - 0.4, 0, debug_img)
+        # cv2.drawContours(debug_img, [current_shape_contour], color=(255, 0, 0), thickness=1)
+        cv2.polylines(debug_img, [current_shape_contour], isClosed=True, color=(255, 0, 0), thickness=1)
         # Draw the planned roll path
         cv2.arrowedLine(debug_img, tuple(S), tuple(E), color=(0, 0, 255), thickness=1)
+        # Draw text
+        cv2.rectangle(debug_img, (5, 5), (160, 100), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Roll trajectory', debug_img)
         cv2.waitKey(0)
 
@@ -319,6 +328,11 @@ def calculate_iou(target_shape, debug_vision):
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
     cv2.fillPoly(current_shape_mask, [current_shape_contour], color=255)
 
+    # Calculate intersection over union
+    intersection = cv2.bitwise_and(current_shape_mask, target_shape_mask)
+    union = cv2.bitwise_or(current_shape_mask, target_shape_mask)
+    iou = np.sum(intersection) / np.sum(union)
+
     if debug_vision:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
@@ -326,18 +340,19 @@ def calculate_iou(target_shape, debug_vision):
         # Draw the target shape
         cv2.circle(debug_img, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=(0, 0, 255), thickness=1)
         # Draw the current shape
-        overlay = RGB_IMG.copy()
-        # overlay = cv2.bitwise_and(debug_img, debug_img, mask=cv2.bitwise_not(current_shape_mask))
-        cv2.fillPoly(overlay, [current_shape_contour], color=(255, 0, 0))
-        alpha = 0.2
-        cv2.addWeighted(overlay, alpha, debug_img, 1 - alpha, 0, debug_img)
+        # drawContours will fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
+        # cv2.drawContours(debug_img, [current_shape_contour], color=(255, 0, 0), thickness=1)
+        cv2.polylines(debug_img, [current_shape_contour], isClosed=True, color=(255, 0, 0), thickness=1)
+        # Draw text
+        cv2.rectangle(debug_img, (5, 5), (160, 130), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_TITLE_PREFIX + 'Intersection over union', debug_img)
         cv2.waitKey(0)
 
-    # Calculate intersection over union
-    intersection = cv2.bitwise_and(current_shape_mask, target_shape_mask)
-    union = cv2.bitwise_or(current_shape_mask, target_shape_mask)
-    return np.sum(intersection) / np.sum(union)
+    return iou
 
 
 def main():
