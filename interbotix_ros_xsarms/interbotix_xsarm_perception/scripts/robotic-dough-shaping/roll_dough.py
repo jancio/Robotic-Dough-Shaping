@@ -380,7 +380,7 @@ def main():
                         help='Choose the roll end point calculation method from: "current" (current shape outline), "target" (target shape outline)')
     parser.add_argument('-tc', '--termination-condition', type=str, default='time', choices=['time', 'iou'], help='Choose either "time" or "iou" termination condition.')
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
-    parser.add_argument('-ld', '--log-dir', type=str, default='/home/RoboG1/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping/logs', help='Path to directory where to save logs.') 
+    parser.add_argument('-ld', '--log-dir', type=str, default='./logs', help='Path to directory where to save logs (relative to this file).') 
     parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Vertical distance above the dough immediately before and after rolling.')
     parser.add_argument('-dr', '--disable-robot', type=bool, default=False, help='Will not send any commands to the robot when set to True.')
     parser.add_argument('-dv', '--debug-vision', type=bool, default=False, help='Show vision output when set to True.')
