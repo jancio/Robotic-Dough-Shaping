@@ -14,6 +14,6 @@ conda activate dough
 cd ~/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping && source ~/interbotix_ws/devel/setup.bash
 
 # Debug / test
-python3 roll_dough.py -dv True -dr True -tv 100
+python3 roll_dough.py -dv -dr -tv 100
 
 python3 sense_force.py -ni 2

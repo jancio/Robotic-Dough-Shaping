@@ -417,8 +417,8 @@ def main():
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
     parser.add_argument('-ld', '--log-dir', type=str, default='./logs', help='Path to directory where to save logs (relative to this file).') 
     parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Vertical distance above the dough immediately before and after rolling.')
-    parser.add_argument('-dr', '--disable-robot', type=bool, default=False, help='Will not send any commands to the robot when set to True.')
-    parser.add_argument('-dv', '--debug-vision', type=bool, default=False, help='Show vision output when set to True.')
+    parser.add_argument('-dr', '--disable-robot', action='store_true', default=False, help='Will not send any commands to the robot when set to True.')
+    parser.add_argument('-dv', '--debug-vision', action='store_true', default=False, help='Show vision output when set to True.')
     args = parser.parse_args()
     params = vars(args)
 
