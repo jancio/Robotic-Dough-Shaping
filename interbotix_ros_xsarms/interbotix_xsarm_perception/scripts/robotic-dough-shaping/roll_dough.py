@@ -28,7 +28,7 @@ from interbotix_perception_modules.pointcloud import InterbotixPointCloudInterfa
 
 
 WINDOW_ID = 'Robotic Dough Shaping'
-IMG_SHAPE = (480, 640) # pizels
+IMG_SHAPE = (480, 640) # pixels
 # Region of interest
 # Note: x and y is swapped in array representation as compared to cv2 image visualization representation!
 # Here x and y are in the cv2 image visualization representation and (0,0) is in the top left corner
@@ -39,29 +39,30 @@ ROI = {
     'y_max': 320    # pixels
 }
 # Target shape detection parameters
-# Only circles with diameters 4 inch or more will be detected
-MIN_TARGET_CIRCLE_RADIUS = 50   # pixels
+MIN_TARGET_CIRCLE_RADIUS = 50   # pixels ( 50 pixels => only circles with diameters 4 inch or more will be detected)
 MAX_TARGET_CIRCLE_RADIUS = 180  # pixels
 # Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000 # pixels^2
+
 # Fraction of dough height reached at the roll start point
 DOUGH_HEIGHT_CONTRACTION_RATIO = 0.5
-# Z_OFFSET = 0.61
-# Z_CORRECTION = 
+# The z correction added to the z coordinate after the point cloud to robot coordinate transformation
+Z_CORRECTION = 0.005468627771547538
 # Minimum z value to move the robot to
 Z_MIN = 0.065 # meters
+
 # Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
 # r = np.dot(T_p2r, p)
-T_p2r = np.array([[ 0.08870469, -0.9955393 , -0.03213995,  0.175572  ],
-                  [-0.99605734, -0.08862224, -0.0039837 ,  0.0246511 ],
-                  [ 0.00111761,  0.03236661, -0.99947544,  0.595534  ],
-                  [ 0.        ,  0.        ,  0.        ,  1.        ]])
+T_pc2ro = np.array([[ 0.08870469, -0.9955393 , -0.03213995,  0.175572  ],
+                   [-0.99605734, -0.08862224, -0.0039837 ,  0.0246511 ],
+                   [ 0.00111761,  0.03236661, -0.99947544,  0.595534  ],
+                   [ 0.        ,  0.        ,  0.        ,  1.        ]])
 # Transformation matrix: camera_color_optical_frame -> wx250s/base_link
-T_i2r = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
-                  [-0.99697964, -0.07765513, -0.00113465,  0.0391628 ],
-                  [-0.00105   ,  0.02808608, -0.99960496,  0.59613603],
-                  [ 0.        ,  0.        ,  0.        ,  1.        ]])
+T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
+                   [-0.99697964, -0.07765513, -0.00113465,  0.0391628 ],
+                   [-0.00105   ,  0.02808608, -0.99960496,  0.59613603],
+                   [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
 RGB_IMG = None
 POINT_CLOUD = None
@@ -221,20 +222,20 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         return intersection + cc
 
 
-def image2robot_coords(pt):
-    # Calculated transform parameters from two points 
-    # Ix1, Iy1 = 320, 323
-    # Ix2, Iy2 = 384, 326
-    # Rx1, Ry1 = 0.0772, 0.0322
-    # Rx2, Ry2 = 0.0756, -0.0306
-    # A = (Rx2 - Rx1) / (Ix2 - Ix1)
-    # B = Rx1 - A*Ix1
-    # C = (Ry2 - Ry1) / (Iy2 - Iy1)
-    # D = Ry1 - C*Iy1
-    # print(f'{A}, {B}, {C}, {D}')
-    A, B = -2.5000000000000066e-05, 0.08520000000000003
-    C, D = -0.02093333333333333, 0.04027500000000002
-    return (A*pt[0] + B, C*pt[1] + D)
+# def image2robot_coords(pt):
+#     # Calculated transform parameters from two points 
+#     # Ix1, Iy1 = 320, 323
+#     # Ix2, Iy2 = 384, 326
+#     # Rx1, Ry1 = 0.0772, 0.0322
+#     # Rx2, Ry2 = 0.0756, -0.0306
+#     # A = (Rx2 - Rx1) / (Ix2 - Ix1)
+#     # B = Rx1 - A*Ix1
+#     # C = (Ry2 - Ry1) / (Iy2 - Iy1)
+#     # D = Ry1 - C*Iy1
+#     # print(f'{A}, {B}, {C}, {D}')
+#     A, B = -2.5000000000000066e-05, 0.08520000000000003
+#     C, D = -0.02093333333333333, 0.04027500000000002
+#     return (A*pt[0] + B, C*pt[1] + D)
 
 
 def image2pointcloud_coords(pt):
@@ -243,10 +244,8 @@ def image2pointcloud_coords(pt):
     return (A*pt[0] + B, C*pt[1] + D)
 
 
-def get_dough_height(pt):
-    # Transform to point cloud coordinates
-    pc_pt = image2pointcloud_coords(pt)
-    print(pt, '->', pc_pt)
+def get_dough_depth(pt):
+    # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
 
     if type(POINT_CLOUD) != GeneratorType:
         raise ValueError(f'No valid point cloud data received from camera!')
@@ -254,23 +253,23 @@ def get_dough_height(pt):
     # Find k closest points in the point cloud (in terms of x and y) and get their average distance from camera
     # point_cloud_arr = np.fromiter(POINT_CLOUD, dtype=np.dtype(float, (3,)))
     point_cloud_arr = np.array(list(POINT_CLOUD))
-    _, idx = KDTree(point_cloud_arr[:, :2]).query([pc_pt], k=3)
+    _, idx = KDTree(point_cloud_arr[:, :2]).query([pt], k=3)
     depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
-    print(np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1])), "CORR=", 0.017 - np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1]))[2])
+    return depth
 
     # Transform to robot coordinates
-    # height = np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1]))[2] + DEPTH_CORRECTION
-    # return height
+    height_ro = np.dot(T_pc2ro, np.array([pt[0], pt[1], depth, 1]))[2] + Z_CORRECTION
+    return height_ro
 
-    max_depth = max(point_cloud_arr[:, 2])
-    print(f'DEPTH: {depth}, max: {max_depth}')
-    return max_depth - depth
+    # max_depth = max(point_cloud_arr[:, 2])
+    # print(f'DEPTH: {depth}, max: {max_depth}')
+    # return max_depth - depth
 
     # ========================================================================================================================
     # S, E before image2robot_coords (410, 162) [378 179]
     # (410, 162) -> (0.0662515886671029, -0.06958948972569104)
-    # [ 0.23201828 -0.03749113  0.01153137  1.        ] CORR= 0.005468627771547538
+    # Robot coords: [ 0.23201828 -0.03749113  0.01153137  1.        ] Z_CORRECTION to add: CORR= 0.005468627771547538
     # DEPTH: 0.5821296572685242, max: 0.6000000238418579
     # Dough height at point S: 0.01787036657333374
     # S, E after image2robot_coords (0.07495, -3.3509249999999997) (0.07575, -3.7067916666666667)
@@ -355,22 +354,25 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Roll trajectory')
         cv2.waitKey(0)
 
-    # Transform from image to robot coordinates
-    print("S, E before image2robot_coords", S, E)
-    S_img = S
-    # Calculate the z coordinates of the points S and E
-    height = get_dough_height(S_img)
-    print(f'Dough height at point S: {height}')
-    S = image2robot_coords(S)
-    E = image2robot_coords(E)
-    print("S, E after image2robot_coords", S, E)
+    # Transform from image to 2D point cloud coordinates
+    S_pc = image2pointcloud_coords(S)
+    E_pc = image2pointcloud_coords(E)
 
-    z = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * height
+    # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
+    depth = get_dough_depth(S_pc)
+
+    # Transform from point cloud to robot coordinates
+    S_ro = np.dot(T_pc2ro, np.array([S_pc[0], S_pc[1], depth, 1]))
+    E_ro = np.dot(T_pc2ro, np.array([E_pc[0], E_pc[1], depth, 1]))
+
+    dough_height_ro = S_ro[2] + Z_CORRECTION
+    if dough_height_ro < 0:
+        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_ro} m. Setting to 0 m.')
+        dough_height_ro = 0
+    z_ro = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * dough_height_ro
+    
     # For now, the end point has the same z location as the start point
-    S = (S[0], S[1], z)
-    E = (E[0], E[1], z)
-
-    return S, E
+    return (S_ro[0], S_ro[1], z_ro), (E_ro[0], E_ro[1], z_ro)
 
 
 def calculate_iou(target_shape, debug_vision):
