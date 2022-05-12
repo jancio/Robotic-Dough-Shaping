@@ -222,22 +222,6 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         return intersection + cc
 
 
-# def image2robot_coords(pt):
-#     # Calculated transform parameters from two points 
-#     # Ix1, Iy1 = 320, 323
-#     # Ix2, Iy2 = 384, 326
-#     # Rx1, Ry1 = 0.0772, 0.0322
-#     # Rx2, Ry2 = 0.0756, -0.0306
-#     # A = (Rx2 - Rx1) / (Ix2 - Ix1)
-#     # B = Rx1 - A*Ix1
-#     # C = (Ry2 - Ry1) / (Iy2 - Iy1)
-#     # D = Ry1 - C*Iy1
-#     # print(f'{A}, {B}, {C}, {D}')
-#     A, B = -2.5000000000000066e-05, 0.08520000000000003
-#     C, D = -0.02093333333333333, 0.04027500000000002
-#     return (A*pt[0] + B, C*pt[1] + D)
-
-
 def image2pointcloud_coords(pt):
     A, B = 0.0009652963665596975, -0.32951992162237304
     C, D = 0.0009512554830209385, -0.22369287797508308
@@ -257,33 +241,6 @@ def get_dough_depth(pt):
     depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
     return depth
-
-    # Transform to robot coordinates
-    height_ro = np.dot(T_pc2ro, np.array([pt[0], pt[1], depth, 1]))[2] + Z_CORRECTION
-    return height_ro
-
-    # max_depth = max(point_cloud_arr[:, 2])
-    # print(f'DEPTH: {depth}, max: {max_depth}')
-    # return max_depth - depth
-
-    # ========================================================================================================================
-    # S, E before image2robot_coords (410, 162) [378 179]
-    # (410, 162) -> (0.0662515886671029, -0.06958948972569104)
-    # Robot coords: [ 0.23201828 -0.03749113  0.01153137  1.        ] Z_CORRECTION to add: CORR= 0.005468627771547538
-    # DEPTH: 0.5821296572685242, max: 0.6000000238418579
-    # Dough height at point S: 0.01787036657333374
-    # S, E after image2robot_coords (0.07495, -3.3509249999999997) (0.07575, -3.7067916666666667)
-    # Calculated roll start point S: ['0.075', '-3.351', '0.074'] m
-    # Calculated roll end point E: ['0.076', '-3.707', '0.074'] m
-    # Calculated the angle of the direction S -> E: -89.871 deg
-    # ========================================================================================================================
-    # Real height of the middle point above the the bottom is 0.017 m
-    # [ 0.35355065  0.37057272 -0.01054889  1.        ]
-    # DEPTH: 0.5986666878064474, max: 0.6000000238418579
-    # Maximum dough height: 0.0013333360354105261
-    # Calculated roll start point S: ['0.075', '-3.958', '0.001'] m
-    # Calculated roll end point E: ['0.076', '-4.251', '0.001'] m
-    # Calculated the angle of the direction S -> E: -89.844 deg
 
 
 def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
@@ -536,21 +493,20 @@ def main():
             print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
             print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
             print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
-            return
 
             if not args.disable_robot:
 
                 # Move to AboveBeforePose
-                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SE)
-
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE)
                 # Move to TouchPose
                 bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SE)
+                return
 
                 # Perform roll to point E
                 bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2], pitch=np.pi/2, yaw=yaw_SE)
 
                 # Move to AboveAfterPose
-                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2] + args.z_above, pitch=np.pi/2, yaw=yaw_SE)
+                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE)
 
                 # Move to ReadyPose
                 go_to_ready_pose()
