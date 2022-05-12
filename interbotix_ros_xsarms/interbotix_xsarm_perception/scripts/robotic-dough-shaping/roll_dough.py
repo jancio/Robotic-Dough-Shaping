@@ -70,7 +70,7 @@ POINT_CLOUD = None
 
 def rgb_img_callback(ros_msg):
     global RGB_IMG
-    RGB_IMG = cv2.imdecode(np.fromstring(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
+    RGB_IMG = cv2.imdecode(np.frombuffer(ros_msg.data, np.uint8), cv2.IMREAD_COLOR)
 
 
 def point_cloud_callback(ros_msg):
@@ -295,7 +295,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     # else:
     #     S = (*calculate_centroid_2d(current_shape_contour), 0.01)
     if start_method == 'centroid-2d':
-        S = calculate_centroid_2d(current_shape_contour)
+        S_im = calculate_centroid_2d(current_shape_contour)
         
     elif start_method == 'centroid-3d':
         #TODO: take point cloud data, filter out by ROI, and then take average
@@ -306,7 +306,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         assert False
 
     # Calculate the roll end point E (in 2D)
-    E = None
+    E_im = None
     C = np.array(target_shape['params']['center'])
     R = target_shape['params']['radius']
     # Find the largest gap between the current and target dough shape
@@ -314,7 +314,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     # [For debugging] Save circle-line intersection points
     # intersection_pts = []
     for P in current_shape_contour[:, 0]:
-        intersection = calculate_circle_line_intersection(C, R, S, P)
+        intersection = calculate_circle_line_intersection(C, R, S_im, P)
         # [For debugging] Save circle-line intersection points
         # intersection_pts.append(intersection.astype(int))
         if intersection is not None:
@@ -322,13 +322,48 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
             if gap > max_gap:
                 max_gap = gap
                 if end_method == 'current':
-                    E = P
+                    E_im = P
                 elif end_method == 'target':
-                    E = intersection.astype(int)
+                    E_im = intersection.astype(int)
 
-    if E is None:
+    if E_im is None:
         raise ValueError(f'No suitable roll end point E found!')
 
+    # Transform from image to 2D point cloud coordinates
+    S_pc = image2pointcloud_coords(S_im)
+    E_pc = image2pointcloud_coords(E_im)
+    # print(S_im, '- im2pc ->', S_pc)
+    # print(E_im, '- im2pc ->', E_pc)
+
+    # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
+    depth = get_dough_depth(S_pc)
+    # print('DEPTH', depth)
+
+    # Transform from point cloud to robot coordinates
+    S_ro = np.dot(T_pc2ro, np.array([S_pc[0], S_pc[1], depth, 1]))
+    E_ro = np.dot(T_pc2ro, np.array([E_pc[0], E_pc[1], depth, 1]))
+    # print(S_pc, '- pc2ro ->', S_ro)
+    # print(E_pc, '- pc2ro ->', E_ro)
+
+    # Apply correction to the z coordinate in robot frame
+    dough_height_ro = S_ro[2] + Z_CORRECTION
+    if dough_height_ro < 0:
+        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_ro} m. Setting to 0 m.')
+        dough_height_ro = 0
+    print(f'Dough height at roll start point S: {dough_height_ro}')
+    
+    # Set z to the fraction of dough height that is reached at the roll start point
+    # Offset by the minimum z value robot can be moved to
+    z_ro = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * dough_height_ro
+
+    # For now, the end point has the same z location as the start point
+    S_ro = (S_ro[0], S_ro[1], z_ro)
+    E_ro = (E_ro[0], E_ro[1], z_ro)
+
+    # Calculate the angle of the direction S -> E
+    # No need to use arctan2 due to symmetry
+    yaw_SE = np.arctan((E_ro[1] - S_ro[1]) / (E_ro[0] - S_ro[0]))
+    
     if debug_vision:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
@@ -343,36 +378,21 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         # for i in intersection_pts:
         #     cv2.circle(debug_img, i, 2, color=(0, 255, 0), thickness=2)
         # Draw the planned roll path
-        cv2.arrowedLine(debug_img, tuple(S), tuple(E), color=(0, 0, 0), thickness=2, tipLength=0.3)
+        cv2.arrowedLine(debug_img, tuple(S_im), tuple(E_im), color=(0, 0, 0), thickness=2, tipLength=0.3)
         # Draw text
-        cv2.rectangle(debug_img, (5, 5), (160, 130), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.rectangle(debug_img, (5, 5), (160, 220), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Planned roll', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Roll angle:', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:.2f} deg', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Dough height:', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{dough_height_ro:.4f} m', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Roll trajectory')
         cv2.waitKey(0)
-
-    # Transform from image to 2D point cloud coordinates
-    S_pc = image2pointcloud_coords(S)
-    E_pc = image2pointcloud_coords(E)
-
-    # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
-    depth = get_dough_depth(S_pc)
-
-    # Transform from point cloud to robot coordinates
-    S_ro = np.dot(T_pc2ro, np.array([S_pc[0], S_pc[1], depth, 1]))
-    E_ro = np.dot(T_pc2ro, np.array([E_pc[0], E_pc[1], depth, 1]))
-
-    dough_height_ro = S_ro[2] + Z_CORRECTION
-    if dough_height_ro < 0:
-        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_ro} m. Setting to 0 m.')
-        dough_height_ro = 0
-    z_ro = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * dough_height_ro
     
-    # For now, the end point has the same z location as the start point
-    return (S_ro[0], S_ro[1], z_ro), (E_ro[0], E_ro[1], z_ro)
+    return S_ro, E_ro, yaw_SE
 
 
 def calculate_iou(target_shape, debug_vision):
@@ -511,15 +531,11 @@ def main():
         iteration = 1
         while not terminate(time() - start_time, iou):
 
-            # Calculate the roll start point S and roll end point E
-            S, E = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, pcl, args.debug_vision)
+            # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, pcl, args.debug_vision)
             print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
             print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
-
-            # Calculate the angle of the direction S -> E
-            # No need to use arctan2 due to symmetry
-            yaw_SE = np.arctan((E[1] - S[1]) / (E[0] - S[0]))
-            print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f} deg')
+            print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
             return
 
             if not args.disable_robot:
