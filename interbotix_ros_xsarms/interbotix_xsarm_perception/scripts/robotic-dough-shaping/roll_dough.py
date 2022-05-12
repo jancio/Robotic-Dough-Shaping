@@ -12,7 +12,7 @@ import csv
 import cv2
 import argparse
 import numpy as np
-from time import time
+from time import time, sleep
 from scipy.linalg import inv
 from datetime import datetime
 from types import GeneratorType
@@ -46,11 +46,12 @@ MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000 # pixels^2
 
 # Fraction of dough height reached at the roll start point
-DOUGH_HEIGHT_CONTRACTION_RATIO = 0.5
+DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO = -0.4
+DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO = -0.4
 # The z correction added to the z coordinate after the point cloud to robot coordinate transformation
 Z_CORRECTION = 0.005468627771547538
 # Minimum z value to move the robot to
-Z_MIN = 0.065 # meters
+Z_MIN = 0.06 # prev contact value = 0.065 meters
 
 # Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
 # r = np.dot(T_p2r, p)
@@ -66,7 +67,7 @@ T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
 
 RGB_IMG = None
 POINT_CLOUD = None
-
+TIME_UPPER_BOUND = 500
 
 def rgb_img_callback(ros_msg):
     global RGB_IMG
@@ -243,7 +244,7 @@ def get_dough_depth(pt):
     return depth
 
 
-def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, debug_vision):
+def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, pcl, debug_vision):
     # Calculate the roll start point S (in 2D)
     current_shape_contour = capture_current_shape(debug_vision=False)
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
@@ -311,11 +312,12 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     
     # Set z to the fraction of dough height that is reached at the roll start point
     # Offset by the minimum z value robot can be moved to
-    z_ro = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * dough_height_ro
+    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height_ro
+    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * dough_height_ro
 
     # For now, the end point has the same z location as the start point
-    S_ro = (S_ro[0], S_ro[1], z_ro)
-    E_ro = (E_ro[0], E_ro[1], z_ro)
+    S_ro = (S_ro[0], S_ro[1], S_z_ro)
+    E_ro = (E_ro[0], E_ro[1], E_z_ro)
 
     # Calculate the angle of the direction S -> E
     # No need to use arctan2 due to symmetry
@@ -337,16 +339,17 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         # Draw the planned roll path
         cv2.arrowedLine(debug_img, tuple(S_im), tuple(E_im), color=(0, 0, 0), thickness=2, tipLength=0.3)
         # Draw text
-        cv2.rectangle(debug_img, (5, 5), (160, 220), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.rectangle(debug_img, (5, 5), (160, 250), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Roll angle:', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:.2f} deg', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'Dough height:', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'{dough_height_ro:.4f} m', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Dough height:', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{dough_height_ro:.4f} m', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Roll angle:', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:.2f} deg', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
-        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Roll trajectory')
+        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Planned roll trajectory and latest IoU')
         cv2.waitKey(0)
     
     return S_ro, E_ro, yaw_SE
@@ -417,7 +420,7 @@ def main():
             return t >= args.termination_value
     elif args.termination_condition == 'iou':
         def terminate(t, iou):
-            return iou >= args.termination_value
+            return iou >= args.termination_value or t > TIME_UPPER_BOUND
     else:
         raise ValueError(f'Unknown termination condition {args.termination_condition}')
 
@@ -435,10 +438,10 @@ def main():
     # Initialize robot
     #########################
 
-    bot = InterbotixManipulatorXS("wx250s")#, moving_time=5, accel_time=5)
+    bot = InterbotixManipulatorXS("wx250s", accel_time=0.1)#, moving_time=2, accel_time=0.3)
 
     def go_to_ready_pose(): 
-        bot.arm.set_ee_pose_components(x=0.057, y=0, z=0.15812, pitch=np.pi/2)
+        bot.arm.set_ee_pose_components(x=0.057, y=0, z=0.15812, pitch=np.pi/2, moving_time=0.5)
 
     #########################
     # Setup logging
@@ -468,7 +471,7 @@ def main():
         params.update(target_shape)
 
         # Calculate current IoU
-        iou = calculate_iou(target_shape, args.debug_vision)
+        iou = calculate_iou(target_shape, debug_vision=False)
 
         # Logging
         time_elapsed = time() - start_time
@@ -489,7 +492,7 @@ def main():
         while not terminate(time() - start_time, iou):
 
             # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, pcl, args.debug_vision)
+            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, iou, pcl, args.debug_vision)
             print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
             print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
             print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
@@ -497,21 +500,23 @@ def main():
             if not args.disable_robot:
 
                 # Move to AboveBeforePose
-                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE)
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE, moving_time=0.5)
+
                 # Move to TouchPose
-                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SE)
+                bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SE, moving_time=1.5)
+                sleep(0.5)
 
                 # Perform roll to point E
-                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2], pitch=np.pi/2, yaw=yaw_SE)
+                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2], pitch=np.pi/2, yaw=yaw_SE, moving_time=2.5)
 
                 # Move to AboveAfterPose
-                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE)
+                bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE, moving_time=1)
 
                 # Move to ReadyPose
                 go_to_ready_pose()
 
             # Calculate current IoU
-            iou = calculate_iou(target_shape, args.debug_vision)
+            iou = calculate_iou(target_shape, debug_vision=False)
 
             # Logging
             time_elapsed = time() - start_time
