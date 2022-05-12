@@ -48,6 +48,7 @@ MIN_CONTOUR_AREA = 1000 # pixels^2
 # Fraction of dough height reached at the roll start point
 DOUGH_HEIGHT_CONTRACTION_RATIO = 0.5
 # Z_OFFSET = 0.61
+# Z_CORRECTION = 
 # Minimum z value to move the robot to
 Z_MIN = 0.065 # meters
 # Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
@@ -245,6 +246,7 @@ def image2pointcloud_coords(pt):
 def get_dough_height(pt):
     # Transform to point cloud coordinates
     pc_pt = image2pointcloud_coords(pt)
+    print(pt, '->', pc_pt)
 
     if type(POINT_CLOUD) != GeneratorType:
         raise ValueError(f'No valid point cloud data received from camera!')
@@ -256,6 +258,10 @@ def get_dough_height(pt):
     depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
     print(np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1])))
+
+    # Transform to robot coordinates
+    # height = np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1]))[2] + DEPTH_CORRECTION
+    # return height
 
     max_depth = max(point_cloud_arr[:, 2])
     print(f'DEPTH: {depth}, max: {max_depth}')
@@ -340,13 +346,15 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
         cv2.waitKey(0)
 
     # Transform from image to robot coordinates
+    print("S, E before image2robot_coords", S, E)
     S = image2robot_coords(S)
     E = image2robot_coords(E)
+    print("S, E after image2robot_coords", S, E)
 
     # Calculate the z coordinates of the points S and E
     height = get_dough_height(S)
-    print(f'Maximum dough height: {height}')
-    z = DOUGH_HEIGHT_CONTRACTION_RATIO * height
+    print(f'Dough height at point S: {height}')
+    z = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * height
     # For now, the end point has the same z location as the start point
     S = (S[0], S[1], z)
     E = (E[0], E[1], z)
