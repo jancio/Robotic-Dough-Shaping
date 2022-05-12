@@ -305,9 +305,9 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
     # Apply correction to the z coordinate in robot frame
     dough_height_ro = S_ro[2] + Z_CORRECTION
     if dough_height_ro < 0:
-        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_ro} m. Setting to 0 m.')
+        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_ro:.4f} m. Setting to 0 m.')
         dough_height_ro = 0
-    print(f'Dough height at roll start point S: {dough_height_ro}')
+    print(f'Dough height at roll start point S: {dough_height_ro:.4f} m')
     
     # Set z to the fraction of dough height that is reached at the roll start point
     # Offset by the minimum z value robot can be moved to
@@ -500,7 +500,6 @@ def main():
                 bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=args.z_above, pitch=np.pi/2, yaw=yaw_SE)
                 # Move to TouchPose
                 bot.arm.set_ee_pose_components(x=S[0], y=S[1], z=S[2], pitch=np.pi/2, yaw=yaw_SE)
-                return
 
                 # Perform roll to point E
                 bot.arm.set_ee_pose_components(x=E[0], y=E[1], z=E[2], pitch=np.pi/2, yaw=yaw_SE)
