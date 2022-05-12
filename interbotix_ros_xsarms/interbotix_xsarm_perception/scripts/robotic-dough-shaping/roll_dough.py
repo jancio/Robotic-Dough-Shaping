@@ -257,7 +257,7 @@ def get_dough_height(pt):
     _, idx = KDTree(point_cloud_arr[:, :2]).query([pc_pt], k=3)
     depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
-    print(np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1])))
+    print(np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1])), "CORR=", 0.017 - np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1]))[2])
 
     # Transform to robot coordinates
     # height = np.dot(T_p2r, np.array([pc_pt[0], pc_pt[1], depth, 1]))[2] + DEPTH_CORRECTION
@@ -267,6 +267,16 @@ def get_dough_height(pt):
     print(f'DEPTH: {depth}, max: {max_depth}')
     return max_depth - depth
 
+    # ========================================================================================================================
+    # S, E before image2robot_coords (410, 162) [378 179]
+    # (410, 162) -> (0.0662515886671029, -0.06958948972569104)
+    # [ 0.23201828 -0.03749113  0.01153137  1.        ] CORR= 0.005468627771547538
+    # DEPTH: 0.5821296572685242, max: 0.6000000238418579
+    # Dough height at point S: 0.01787036657333374
+    # S, E after image2robot_coords (0.07495, -3.3509249999999997) (0.07575, -3.7067916666666667)
+    # Calculated roll start point S: ['0.075', '-3.351', '0.074'] m
+    # Calculated roll end point E: ['0.076', '-3.707', '0.074'] m
+    # Calculated the angle of the direction S -> E: -89.871 deg
     # ========================================================================================================================
     # Real height of the middle point above the the bottom is 0.017 m
     # [ 0.35355065  0.37057272 -0.01054889  1.        ]
@@ -347,13 +357,14 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, pcl, de
 
     # Transform from image to robot coordinates
     print("S, E before image2robot_coords", S, E)
+    S_img = S
+    # Calculate the z coordinates of the points S and E
+    height = get_dough_height(S_img)
+    print(f'Dough height at point S: {height}')
     S = image2robot_coords(S)
     E = image2robot_coords(E)
     print("S, E after image2robot_coords", S, E)
 
-    # Calculate the z coordinates of the points S and E
-    height = get_dough_height(S)
-    print(f'Dough height at point S: {height}')
     z = Z_MIN + DOUGH_HEIGHT_CONTRACTION_RATIO * height
     # For now, the end point has the same z location as the start point
     S = (S[0], S[1], z)
