@@ -13,7 +13,6 @@ import cv2
 import argparse
 import numpy as np
 from time import time, sleep
-from scipy.linalg import inv
 from datetime import datetime
 from types import GeneratorType
 
@@ -39,7 +38,7 @@ ROI = {
     'y_max': 320    # pixels
 }
 # Target shape detection parameters
-MIN_TARGET_CIRCLE_RADIUS = 50   # pixels ( 50 pixels => only circles with diameters 4 inch or more will be detected)
+MIN_TARGET_CIRCLE_RADIUS = 50   # pixels (50 pixels => only circles with diameters 4 inch or more will be detected)
 MAX_TARGET_CIRCLE_RADIUS = 180  # pixels
 # Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
@@ -48,16 +47,15 @@ MIN_CONTOUR_AREA = 1000 # pixels^2
 # Fraction of dough height reached at the roll start point
 DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO = -0.4
 DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO = -0.4
-# The z correction added to the z coordinate after the point cloud to robot coordinate transformation
+# Manually measured correction added to the z coordinate in the point cloud to robot coordinate transformation
 Z_CORRECTION = 0.005468627771547538
 # Minimum z value to move the robot to
 Z_MIN = 0.06 # prev contact value = 0.065 meters
 
 # Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
-# r = np.dot(T_p2r, p)
 T_pc2ro = np.array([[ 0.08870469, -0.9955393 , -0.03213995,  0.175572  ],
                    [-0.99605734, -0.08862224, -0.0039837 ,  0.0246511 ],
-                   [ 0.00111761,  0.03236661, -0.99947544,  0.595534  ],
+                   [ 0.00111761,  0.03236661, -0.99947544,  0.595534 + Z_CORRECTION ],
                    [ 0.        ,  0.        ,  0.        ,  1.        ]])
 # Transformation matrix: camera_color_optical_frame -> wx250s/base_link
 T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
@@ -65,9 +63,12 @@ T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
                    [-0.00105   ,  0.02808608, -0.99960496,  0.59613603],
                    [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
+TERMINATION_TIME_UPPER_BOUND = 500 # seconds
+
+
 RGB_IMG = None
 POINT_CLOUD = None
-TIME_UPPER_BOUND = 500
+
 
 def rgb_img_callback(ros_msg):
     global RGB_IMG
@@ -84,7 +85,7 @@ def get_ROI_img(img):
     return img[ROI['y_min']:ROI['y_max'], ROI['x_min']:ROI['x_max']]
 
 
-def capture_target_shape(debug_vision):
+def capture_target_shape(visual_output):
     if type(RGB_IMG) != np.ndarray or RGB_IMG.shape != (*IMG_SHAPE, 3):
         raise ValueError(f'No valid RGB image data received from camera!')
 
@@ -113,7 +114,7 @@ def capture_target_shape(debug_vision):
     y = int(largest_circle[1]) + ROI['y_min']
     r = int(largest_circle[2])
 
-    if debug_vision:
+    if visual_output:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
@@ -136,7 +137,7 @@ def capture_target_shape(debug_vision):
     }
 
 
-def capture_current_shape(debug_vision):
+def capture_current_shape(visual_output):
     ROI_rgb_img = get_ROI_img(RGB_IMG)
 
     # Color filter
@@ -159,7 +160,7 @@ def capture_current_shape(debug_vision):
     # Undo ROI transform
     current_shape_contour[:, 0] += np.array([ROI['x_min'], ROI['y_min']])
 
-    if debug_vision:
+    if visual_output:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
@@ -244,9 +245,23 @@ def get_dough_depth(pt):
     return depth
 
 
-def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, pcl, debug_vision):
+def get_heighest_dough_point():
+    # Get highest dough point in robot coordinates
+
+    if type(POINT_CLOUD) != GeneratorType:
+        raise ValueError(f'No valid point cloud data received from camera!')
+    
+    # Find the highest point in the point cloud (in terms of z)
+    H_pc = sorted(POINT_CLOUD, key=lambda pt: pt[2])[0]
+    # Transform from point cloud to robot coordinates
+    H_ro = np.dot(T_pc2ro, np.array([*H_pc, 1]))[:3]
+
+    return H_ro
+
+
+def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, iteration, start_time, pcl, visual_output):
     # Calculate the roll start point S (in 2D)
-    current_shape_contour = capture_current_shape(debug_vision=False)
+    current_shape_contour = capture_current_shape(visual_output=False)
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
@@ -303,27 +318,33 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, pc
     # print(S_pc, '- pc2ro ->', S_ro)
     # print(E_pc, '- pc2ro ->', E_ro)
 
-    # Apply correction to the z coordinate in robot frame
-    dough_height_ro = S_ro[2] + Z_CORRECTION
-    if dough_height_ro < 0:
-        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_ro:.4f} m. Setting to 0 m.')
-        dough_height_ro = 0
-    print(f'Dough height at roll start point S: {dough_height_ro:.4f} m')
+    dough_height = S_ro[2]
+    if dough_height < 0:
+        print(f'Warning: The estimated dough height at the roll start point S is {dough_height:.4f} m. Setting to 0 m.')
+        dough_height = 0
+    print(f'Dough height at roll start point S: {dough_height:.4f} m')
     
     # Set z to the fraction of dough height that is reached at the roll start point
     # Offset by the minimum z value robot can be moved to
-    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height_ro
-    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * dough_height_ro
+    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height
+    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * dough_height
 
-    # For now, the end point has the same z location as the start point
     S_ro = (S_ro[0], S_ro[1], S_z_ro)
     E_ro = (E_ro[0], E_ro[1], E_z_ro)
 
     # Calculate the angle of the direction S -> E
     # No need to use arctan2 due to symmetry
     yaw_SE = np.arctan((E_ro[1] - S_ro[1]) / (E_ro[0] - S_ro[0]))
+
+
+    _, _, max_dough_height = get_heighest_dough_point()
+    if max_dough_height < 0:
+        print(f'Warning: The estimated maximum dough height is {max_dough_height:.4f} m. Setting to 0 m.')
+        max_dough_height = 0
+    print(f'Maximum dough height: {max_dough_height:.4f} m')
+
     
-    if debug_vision:
+    if visual_output:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
@@ -339,15 +360,21 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, pc
         # Draw the planned roll path
         cv2.arrowedLine(debug_img, tuple(S_im), tuple(E_im), color=(0, 0, 0), thickness=2, tipLength=0.3)
         # Draw text
-        cv2.rectangle(debug_img, (5, 5), (160, 250), color=(255, 255, 255), thickness=cv2.FILLED)
-        cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'Dough height:', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'{dough_height_ro:.4f} m', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Roll angle:', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:.2f} deg', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.rectangle(debug_img, (5, 5), (160, 400), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.putText(debug_img, f'Method:', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{start_method: >15}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Iteration: {iteration:6d}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Time:  {(time() - start_time):7.1f} s', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.line(debug_img, (10, 130), (155, 130), color=(150, 150, 150), thickness=1)
+        cv2.putText(debug_img, 'ROI', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Target shape', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Current shape', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'IoU = {iou:.3f}', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Dough height:', (10, 270), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- max: {max_dough_height:.3f} m', (10, 300), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- at S: {dough_height:.3f} m', (10, 330), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Roll angle S->E:', (10, 360), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Planned roll trajectory and latest IoU')
         cv2.waitKey(0)
@@ -355,7 +382,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, pc
     return S_ro, E_ro, yaw_SE
 
 
-def calculate_iou(target_shape, debug_vision):
+def calculate_iou(target_shape, visual_output):
     # Calculate target shape mask
     target_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     if target_shape['type'] != 'circle':
@@ -363,7 +390,7 @@ def calculate_iou(target_shape, debug_vision):
     cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
     # Calculate current shape mask
-    current_shape_contour = capture_current_shape(debug_vision=False)
+    current_shape_contour = capture_current_shape(visual_output=False)
     current_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
     cv2.fillPoly(current_shape_mask, [current_shape_contour], color=255)
@@ -373,7 +400,7 @@ def calculate_iou(target_shape, debug_vision):
     union = cv2.bitwise_or(current_shape_mask, target_shape_mask)
     iou = np.sum(intersection) / np.sum(union)
 
-    if debug_vision:
+    if visual_output:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
         cv2.rectangle(debug_img, (ROI['x_min'], ROI['y_min']), (ROI['x_max'], ROI['y_max']), color=(0, 255, 0), thickness=1)
@@ -409,9 +436,9 @@ def main():
     parser.add_argument('-tc', '--termination-condition', type=str, default='time', choices=['time', 'iou'], help='Choose either "time" or "iou" termination condition.')
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
     parser.add_argument('-ld', '--log-dir', type=str, default='./logs', help='Path to directory where to save logs (relative to this file).') 
-    parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Vertical distance above the dough immediately before and after rolling.')
+    parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Height above the base/table immediately before and after rolling.')
     parser.add_argument('-dr', '--disable-robot', action='store_true', default=False, help='Will not send any commands to the robot when set to True.')
-    parser.add_argument('-dv', '--debug-vision', action='store_true', default=False, help='Show vision output when set to True.')
+    parser.add_argument('-vo', '--visual-output', action='store_true', default=False, help='Show visual output when set to True.')
     args = parser.parse_args()
     params = vars(args)
 
@@ -420,7 +447,7 @@ def main():
             return t >= args.termination_value
     elif args.termination_condition == 'iou':
         def terminate(t, iou):
-            return iou >= args.termination_value or t > TIME_UPPER_BOUND
+            return iou >= args.termination_value or t > TERMINATION_TIME_UPPER_BOUND
     else:
         raise ValueError(f'Unknown termination condition {args.termination_condition}')
 
@@ -467,11 +494,11 @@ def main():
             go_to_ready_pose()
 
         # Capture the target dough shape
-        target_shape = capture_target_shape(debug_vision=False)
+        target_shape = capture_target_shape(visual_output=False)
         params.update(target_shape)
 
         # Calculate current IoU
-        iou = calculate_iou(target_shape, debug_vision=False)
+        iou = calculate_iou(target_shape, visual_output=False)
 
         # Logging
         time_elapsed = time() - start_time
@@ -492,7 +519,7 @@ def main():
         while not terminate(time() - start_time, iou):
 
             # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, iou, pcl, args.debug_vision)
+            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, iou, iteration, start_time, pcl, args.visual_output)
             print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
             print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
             print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
@@ -516,7 +543,7 @@ def main():
                 go_to_ready_pose()
 
             # Calculate current IoU
-            iou = calculate_iou(target_shape, debug_vision=False)
+            iou = calculate_iou(target_shape, visual_output=False)
 
             # Logging
             time_elapsed = time() - start_time
