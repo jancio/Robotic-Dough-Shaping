@@ -45,6 +45,7 @@ MAX_TARGET_CIRCLE_RADIUS = 180  # pixels
 # Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
 MIN_CONTOUR_AREA = 1000 # pixels^2
+INCHES_PER_PIXEL = 0.03926950683443001
 
 # Fraction of dough height reached at the roll start point
 DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO = -0.4
@@ -479,9 +480,10 @@ def main():
     #########################
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sm', '--start-method', type=str, default='centroid-2d', choices=['centroid-2d', 'centroid-3d', 'highest-point'],
+    parser.add_argument('-m', '--material', type=str, required=True, choices=['play-doh', 'plasticine', 'kinetic-sand'], help='Choose material to be rolled.')
+    parser.add_argument('-sm', '--start-method', type=str, required=True, choices=['centroid-2d', 'centroid-3d', 'highest-point'],
                         help='Choose the roll start point calculation method from: "centroid-2d", "centroid-3d", and "highest-point"')
-    parser.add_argument('-em', '--end-method', type=str, default='current', choices=['current', 'target'],
+    parser.add_argument('-em', '--end-method', type=str, required=True, choices=['current', 'target'],
                         help='Choose the roll end point calculation method from: "current" (current shape outline), "target" (target shape outline)')
     parser.add_argument('-tc', '--termination-condition', type=str, default='time', choices=['time', 'iou'], help='Choose either "time" or "iou" termination condition.')
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
@@ -524,30 +526,31 @@ def main():
         bot.arm.set_ee_pose_components(x=0.057, y=0, z=0.15812, pitch=np.pi/2, moving_time=0.5)
 
     #########################
+    # Preparation
+    #########################
+
+    iteration = 0
+    start_time = time()
+
+    # Move to ReadyPose
+    if not args.disable_robot:
+        go_to_ready_pose()
+
+    # Capture the target dough shape
+    target_shape = capture_target_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
+    params.update(target_shape)
+
+    #########################
     # Setup logging
     #########################
 
     if not os.path.isdir(args.log_dir):
         os.makedirs(args.log_dir)
 
-    log_filename = f'log_{args.termination_condition}_{args.termination_value}_{args.start_method}_{args.end_method}_{datetime.now().strftime("%Y%m%d-%H%M%S-%f")}'
+    target_shape_diameter_estimate = 2 * target_shape['params']['radius'] * INCHES_PER_PIXEL
+    log_filename = f'log_{args.material}_{target_shape_diameter_estimate:.1f}_{args.start_method}_{args.end_method}_{args.termination_condition}_{args.termination_value}_{datetime.now().strftime("%Y%m%d-%H%M%S-%f")}'
     with open(f'{args.log_dir}/{log_filename}.csv', 'w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-
-        #########################
-        # Preparation
-        #########################
-
-        iteration = 0
-        start_time = time()
-
-        # Move to ReadyPose
-        if not args.disable_robot:
-            go_to_ready_pose()
-
-        # Capture the target dough shape
-        target_shape = capture_target_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-        params.update(target_shape)
 
         # Logging
         time_elapsed = time() - start_time
