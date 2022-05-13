@@ -68,6 +68,7 @@ T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
 T_im2pc = np.array([[ 0.0009652963665596975, 0.                   , -0.32951992162237304 ],
                     [ 0.                   , 0.0009512554830209385, -0.22369287797508308 ],
                     [ 0.                   , 0.                   ,  1.                  ]])
+T_pc2im = inv(T_im2pc)
 
 TERMINATION_TIME_UPPER_BOUND = 500 # seconds
 
@@ -194,6 +195,31 @@ def calculate_centroid_2d(contour):
     return np.array([ int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]) ])
 
 
+def calculate_centroid_3d(roi=None):
+    if type(POINT_CLOUD) != GeneratorType:
+        raise ValueError(f'No valid point cloud data received from camera!')
+
+    if roi is None:
+        return np.mean(list(POINT_CLOUD), axis=0)
+
+    # If the point cloud filter is not tuned, need to filter out points outside of region of interest (current shape contour)
+    #     Create boolean mask from current_shape_contour
+    #     For each point in point cloud: 
+    #         Transform to image space
+    #         Check if it is inside
+    roi_mask = np.zeros(IMG_SHAPE, dtype="uint8")
+    cv2.fillPoly(roi_mask, [roi], color=255)
+    num_points = 0
+    centroid = np.zeros(3)
+    for pt in POINT_CLOUD:
+        x, y = np.dot(T_pc2im, np.array([pt[0], pt[1], 1]))[:2]
+        x, y = round(x), round(y)
+        if x >= 0 and y >= 0 and y < roi_mask.shape[0] and x < roi_mask.shape[1] and roi_mask[y, x] == 255:
+            num_points += 1
+            centroid += np.array(pt)
+    return centroid / num_points
+
+
 def calculate_circle_line_intersection(cc, r, p1, p2):
     # Args: circle center, circle radius, 
     #       line point 1 (roll start point), line point 2 (candidate end point on dough boundary)
@@ -233,7 +259,7 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
 
 
 def get_dough_depth(pt):
-    # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
+    # Get dough depth in point cloud coordinates in the proximity of a given point in 2D point cloud coordinates
 
     if type(POINT_CLOUD) != GeneratorType:
         raise ValueError(f'No valid point cloud data received from camera!')
@@ -248,7 +274,7 @@ def get_dough_depth(pt):
 
 
 def get_heighest_dough_point():
-    # Get highest dough point in point cloud coordinates
+    # Get highest dough point in 3D point cloud coordinates
 
     if type(POINT_CLOUD) != GeneratorType:
         raise ValueError(f'No valid point cloud data received from camera!')
@@ -281,15 +307,19 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
         # print('DEPTH', depth)
         
     elif start_method == 'centroid-3d':
-        #TODO: take point cloud data, filter out by ROI, and then take average
-        assert False
-
-    elif start_method == 'highest-point':
-        S_pc = H_pc[:2]
-        depth_pc = H_pc[2]
+        # If the point cloud filter is not tuned, need to filter out points outside of current_shape_contour
+        # *S_pc, depth_pc = calculate_centroid_3d(current_shape_contour)
+        *S_pc, depth_pc = calculate_centroid_3d()
 
         # Transform from 2D point cloud to image coordinates
-        S_im = np.dot(inv(T_im2pc), np.array([*S_pc, 1]))[:2]
+        S_im = np.dot(T_pc2im, np.array([*S_pc, 1]))[:2]
+        # print(S_pc, '- pc2im ->', S_im)
+
+    elif start_method == 'highest-point':
+        *S_pc, depth_pc = H_pc
+
+        # Transform from 2D point cloud to image coordinates
+        S_im = np.dot(T_pc2im, np.array([*S_pc, 1]))[:2]
         # print(S_pc, '- pc2im ->', S_im)
 
     # Calculate the roll end point E (in 2D)
