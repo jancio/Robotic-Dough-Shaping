@@ -285,13 +285,12 @@ def get_heighest_dough_point():
     return H_pc
 
 
-def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
+def calculate_roll_start_and_end(start_method, end_method, target_shape, current_shape_contour, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
     # else:
     #     S = (*calculate_centroid_2d(current_shape_contour), 0.01)
-    current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
     H_pc = get_heighest_dough_point()
 
     # Calculate the roll start point S (in 2D)
@@ -379,6 +378,10 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
     # No need to use arctan2 due to symmetry
     yaw_SE = np.arctan((E_ro[1] - S_ro[1]) / (E_ro[0] - S_ro[0]))
 
+    print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S_ro]} m')
+    print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E_ro]} m')
+    print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
+
     if visual_output:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
@@ -418,7 +421,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
     return S_ro, E_ro, yaw_SE
 
 
-def calculate_iou(target_shape, visual_output, keyboard, visual_wait):
+def calculate_iou(target_shape, current_shape_contour, visual_output, keyboard, visual_wait):
     # Calculate target shape mask
     target_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     if target_shape['type'] != 'circle':
@@ -426,7 +429,6 @@ def calculate_iou(target_shape, visual_output, keyboard, visual_wait):
     cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
     # Calculate current shape mask
-    current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
     current_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
     cv2.fillPoly(current_shape_mask, [current_shape_contour], color=255)
@@ -527,7 +529,6 @@ def main():
 
         iteration = 0
         start_time = time()
-        iou = 0.
 
         # Move to ReadyPose
         if not args.disable_robot:
@@ -537,19 +538,29 @@ def main():
         target_shape = capture_target_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
         params.update(target_shape)
 
-        # Calculate current IoU
-        iou = calculate_iou(target_shape, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-
         # Logging
         time_elapsed = time() - start_time
+        params['preparation_time'] = time_elapsed
         print('=' * 120)
         print(f'Params:\n{json.dumps(params, indent=2)}')
-        print(f'Preparation: \t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
+        print(f'Preparation: \t Time: {time_elapsed:5.3f} s')
         print('=' * 120)
         # First line is a dictionary of parameters
         csv_writer.writerow([json.dumps(params)])
         # Second line is the header
         csv_writer.writerow(['Iteration', 'Time', 'IoU'])
+
+        # Calculate current shape contour
+        current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
+        # Calculate current IoU
+        iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
+        # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+        S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, current_shape_contour, iou, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+
+        # Logging
+        time_elapsed = time() - start_time
+        print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
+        print('=' * 120)
         csv_writer.writerow([iteration, time_elapsed, iou])
 
         #########################
@@ -557,12 +568,6 @@ def main():
         #########################
         iteration = 1
         while not terminate(time() - start_time, iou):
-
-            # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, iou, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
-            print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
-            print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
-            print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
 
             if not args.disable_robot:
 
@@ -582,8 +587,12 @@ def main():
                 # Move to ReadyPose
                 go_to_ready_pose()
 
+            # Calculate current shape contour
+            current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
             # Calculate current IoU
-            iou = calculate_iou(target_shape, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
+            iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
+            # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, current_shape_contour, iou, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
 
             # Logging
             time_elapsed = time() - start_time
