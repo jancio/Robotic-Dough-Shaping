@@ -1,4 +1,3 @@
-from ctypes.wintypes import RGB
 import cv2
 import numpy as np
 
@@ -88,10 +87,10 @@ def main():
 
 
     # 1.) load stripes from image
-    stripes = cv2.imread('./stripes_pattern.jpg')
-    stripes = cv2.resize(stripes, (RGB_IMG.shape[1], RGB_IMG.shape[0]))
+    # stripes = cv2.imread('./stripes_pattern.jpg')
+    # stripes = cv2.resize(stripes, (RGB_IMG.shape[1], RGB_IMG.shape[0]))
 
-    stripes[:, :, 0] = 255
+    # stripes[:, :, 0] = 255
 
 
     # 2.) Generate stripes
@@ -123,15 +122,76 @@ def main():
     cv2.polylines(debug_img, [current_shape_contour], isClosed=True, color=(255, 0, 0), thickness=1)
 
     iou = 0.4352
+    dough_height_ro = 0.323253546
+    yaw_SE = 1.4435363
     # Draw text
-    cv2.rectangle(debug_img, (5, 5), (160, 130), color=(255, 255, 255), thickness=cv2.FILLED)
-    cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
-    cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
+    # cv2.rectangle(debug_img, (5, 5), (160, 130), color=(255, 255, 255), thickness=cv2.FILLED)
+    # cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
     # cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
     # cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
 
-    cv2.imshow('color image', debug_img)
-    cv2.waitKey(0)
+    # cv2.rectangle(debug_img, (5, 5), (160, 250), color=(255, 255, 255), thickness=cv2.FILLED)
+    # cv2.putText(debug_img, 'ROI', (10, 30), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 255, 0), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 0, 255), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(255, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, f'Dough height at S:', (10, 150), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, f'{dough_height_ro:.4f} m', (10, 180), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, 'Roll angle S->E:', (10, 210), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+    # cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:.2f} deg', (10, 240), cv2.FONT_HERSHEY_PLAIN, fontScale=1.1, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+
+
+    iteration = 54
+    max_dough_height_ro = dough_height_ro
+    time_elapsed = 2.3
+    method = 'centroid-2d'
+
+    from time import sleep
+
+    from pynput.keyboard import Key, Controller
+
+    keyboard = Controller()
+    key = "a"
+
+    enable_shrink = False
+
+    # keyboard.press(key)
+
+    for iteration in range(0, 10):
+        
+        cv2.rectangle(debug_img, (5, 5), (165, 400), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.putText(debug_img, f'Method:', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- {method}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- shrink {"enabled" if enable_shrink else "disabled"}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+
+        # cv2.putText(debug_img, f'Iteration: {iteration:6d}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Time:  {time_elapsed:7.1f} s', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.line(debug_img, (10, 130), (155, 130), color=(150, 150, 150), thickness=1)
+
+        cv2.putText(debug_img, 'ROI', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Target shape', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Current shape', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+
+        cv2.putText(debug_img, f'IoU = {iou:.3f}', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Dough height:', (10, 270), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- max: {max_dough_height_ro:.3f} m', (10, 300), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- at S: {dough_height_ro:.3f} m', (10, 330), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Roll angle S->E:', (10, 360), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+
+        cv2.imshow('color image', debug_img)
+
+        # keyboard.press(Key.space)
+        cv2.waitKey(0)
+
+        # sleep(1)
+
+
+
+
+
+
     cv2.destroyAllWindows() 
 
 if __name__=='__main__':
