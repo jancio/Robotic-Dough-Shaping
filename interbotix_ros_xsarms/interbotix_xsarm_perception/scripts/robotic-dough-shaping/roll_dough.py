@@ -12,6 +12,7 @@ import csv
 import cv2
 import argparse
 import numpy as np
+from scipy.linalg import inv
 from time import time, sleep
 from datetime import datetime
 from types import GeneratorType
@@ -63,6 +64,10 @@ T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
                    [-0.99697964, -0.07765513, -0.00113465,  0.0391628 ],
                    [-0.00105   ,  0.02808608, -0.99960496,  0.59613603],
                    [ 0.        ,  0.        ,  0.        ,  1.        ]])
+# Transformation matrix: image 2D -> point cloud 2D
+T_im2pc = np.array([[ 0.0009652963665596975, 0.                   , -0.32951992162237304 ],
+                    [ 0.                   , 0.0009512554830209385, -0.22369287797508308 ],
+                    [ 0.                   , 0.                   ,  1.                  ]])
 
 TERMINATION_TIME_UPPER_BOUND = 500 # seconds
 
@@ -186,7 +191,7 @@ def calculate_centroid_2d(contour):
     M = cv2.moments(contour)
     if M['m00'] == 0:
         raise ValueError('Failed to calculate the centroid of the current dough shape!')
-    return int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+    return np.array([ int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]) ])
 
 
 def calculate_circle_line_intersection(cc, r, p1, p2):
@@ -227,12 +232,6 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
         return intersection + cc
 
 
-def image2pointcloud_coords(pt):
-    A, B = 0.0009652963665596975, -0.32951992162237304
-    C, D = 0.0009512554830209385, -0.22369287797508308
-    return (A*pt[0] + B, C*pt[1] + D)
-
-
 def get_dough_depth(pt):
     # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
 
@@ -249,37 +248,49 @@ def get_dough_depth(pt):
 
 
 def get_heighest_dough_point():
-    # Get highest dough point in robot coordinates
+    # Get highest dough point in point cloud coordinates
 
     if type(POINT_CLOUD) != GeneratorType:
         raise ValueError(f'No valid point cloud data received from camera!')
     
     # Find the highest point in the point cloud (in terms of z)
     H_pc = sorted(POINT_CLOUD, key=lambda pt: pt[2])[0]
-    # Transform from point cloud to robot coordinates
-    H_ro = np.dot(T_pc2ro, np.array([*H_pc, 1]))[:3]
 
-    return H_ro
+    return H_pc
 
 
 def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
-    # Calculate the roll start point S (in 2D)
-    current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
     # else:
     #     S = (*calculate_centroid_2d(current_shape_contour), 0.01)
+    current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
+    H_pc = get_heighest_dough_point()
+
+    # Calculate the roll start point S (in 2D)
     if start_method == 'centroid-2d':
         S_im = calculate_centroid_2d(current_shape_contour)
+
+        # Transform from image to 2D point cloud coordinates
+        S_pc = np.dot(T_im2pc, np.array([*S_im, 1]))[:2]
+        # print(S_im, '- im2pc ->', S_pc)
+
+        # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
+        depth_pc = get_dough_depth(S_pc)
+        # print('DEPTH', depth)
         
     elif start_method == 'centroid-3d':
         #TODO: take point cloud data, filter out by ROI, and then take average
         assert False
 
     elif start_method == 'highest-point':
-        #TODO: take point cloud data, filter out by ROI, and then sort by height
-        assert False
+        S_pc = H_pc[:2]
+        depth_pc = H_pc[2]
+
+        # Transform from 2D point cloud to image coordinates
+        S_im = np.dot(inv(T_im2pc), np.array([*S_pc, 1]))[:2]
+        # print(S_pc, '- pc2im ->', S_im)
 
     # Calculate the roll end point E (in 2D)
     E_im = None
@@ -306,18 +317,12 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
         raise ValueError(f'No suitable roll end point E found!')
 
     # Transform from image to 2D point cloud coordinates
-    S_pc = image2pointcloud_coords(S_im)
-    E_pc = image2pointcloud_coords(E_im)
-    # print(S_im, '- im2pc ->', S_pc)
+    E_pc = np.dot(T_im2pc, np.array([*E_im, 1]))[:2]
     # print(E_im, '- im2pc ->', E_pc)
 
-    # Get dough depth in point cloud coordinates in the proximity of a given point in point cloud coordinates
-    depth = get_dough_depth(S_pc)
-    # print('DEPTH', depth)
-
     # Transform from point cloud to robot coordinates
-    S_ro = np.dot(T_pc2ro, np.array([S_pc[0], S_pc[1], depth, 1]))
-    E_ro = np.dot(T_pc2ro, np.array([E_pc[0], E_pc[1], depth, 1]))
+    S_ro = np.dot(T_pc2ro, np.array([S_pc[0], S_pc[1], depth_pc, 1]))[:3]
+    E_ro = np.dot(T_pc2ro, np.array([E_pc[0], E_pc[1], depth_pc, 1]))[:3]
     # print(S_pc, '- pc2ro ->', S_ro)
     # print(E_pc, '- pc2ro ->', E_ro)
 
@@ -326,7 +331,12 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
         print(f'Warning: The estimated dough height at the roll start point S is {dough_height:.4f} m. Setting to 0 m.')
         dough_height = 0
     print(f'Dough height at roll start point S: {dough_height:.4f} m')
-    
+    max_dough_height = np.dot(T_pc2ro, np.array([*H_pc, 1]))[2]
+    if max_dough_height < 0:
+        print(f'Warning: The estimated maximum dough height is {max_dough_height:.4f} m. Setting to 0 m.')
+        max_dough_height = 0
+    print(f'Maximum dough height: {max_dough_height:.4f} m')
+
     # Set z to the fraction of dough height that is reached at the roll start point
     # Offset by the minimum z value robot can be moved to
     S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height
@@ -339,14 +349,6 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
     # No need to use arctan2 due to symmetry
     yaw_SE = np.arctan((E_ro[1] - S_ro[1]) / (E_ro[0] - S_ro[0]))
 
-
-    _, _, max_dough_height = get_heighest_dough_point()
-    if max_dough_height < 0:
-        print(f'Warning: The estimated maximum dough height is {max_dough_height:.4f} m. Setting to 0 m.')
-        max_dough_height = 0
-    print(f'Maximum dough height: {max_dough_height:.4f} m')
-
-    
     if visual_output:
         debug_img = RGB_IMG.copy()
         # Draw the region of interest
