@@ -607,7 +607,7 @@ def main():
         os.makedirs(args.log_dir)
 
     target_shape_diameter_estimate = 2 * target_shape['params']['radius'] * INCHES_PER_PIXEL
-    log_filename = f'log_{args.material}_{target_shape_diameter_estimate:.1f}_{args.start_method}_{args.end_method}_{args.termination_condition}_{args.termination_value}_{datetime.now().strftime("%Y%m%d-%H%M%S-%f")}'
+    log_filename = f'log_{args.material}_{target_shape_diameter_estimate:.1f}_{args.start_method}_{args.end_method}_{"shrink-enabled" if args.enable_shrink else "shrink-disabled"}_{args.termination_condition}_{args.termination_value}_{datetime.now().strftime("%Y%m%d-%H%M%S-%f")}'
     with open(f'{args.log_dir}/{log_filename}.csv', 'w', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
 
