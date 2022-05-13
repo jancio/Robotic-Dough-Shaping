@@ -1,19 +1,70 @@
-
+##################################################################################################
 # In terminal
 
 conda activate dough
 
 source ~/interbotix_ws/devel/setup.bash && roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
 
-#################################################
+##################################################################################################
 # In vscode
-
 
 conda activate dough
 
 cd ~/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping && source ~/interbotix_ws/devel/setup.bash
 
 # Debug / test
-python3 roll_dough.py -dv -dr -tv 100
+python3 roll_dough.py -vo -dr -tv 100
 
 python3 sense_force.py -ni 2
+
+##################################################################################################
+# Experiments
+
+# For all: terminate after 300 s
+
+----------------------------------------------------------------------------------
+# Experiment 1 [exp01] - compare 3 materials across 3 start methods
+#                      - target shape, end method fixed
+----------------------------------------------------------------------------------
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m plasticine -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m kinetic-sand -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+
+python3 roll_dough.py -m play-doh -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m plasticine -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m kinetic-sand -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+
+python3 roll_dough.py -m play-doh -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m plasticine -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m kinetic-sand -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
+
+----------------------------------------------------------------------------------
+# Experiment 2 [exp02] - compare 3 start methods across 3 target shape sizes
+#                      - material, end method fixed
+----------------------------------------------------------------------------------
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp02
+
+python3 roll_dough.py -m play-doh -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp02
+
+python3 roll_dough.py -m play-doh -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp02
+
+----------------------------------------------------------------------------------
+# Experiment 3 [exp03] - compare 2 end methods across 3 target shape sizes
+#                      - target shape, material, start method fixed
+----------------------------------------------------------------------------------
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp03
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em current -tc time -tv 300 -vo -ld ./logs/exp03
+
+----------------------------------------------------------------------------------
+# Experiment 4 [exp04] - compare shrink enabled vs. disabled
+#                      - target shape, material, start method, end method fixed
+----------------------------------------------------------------------------------
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -es -tc time -tv 300 -vo -ld ./logs/exp04
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp04
+
