@@ -15,6 +15,7 @@ import numpy as np
 from time import time, sleep
 from datetime import datetime
 from types import GeneratorType
+from pynput.keyboard import Key, Controller
 
 import rospy
 from sensor_msgs.msg import CompressedImage
@@ -65,7 +66,7 @@ T_co2ro = np.array([[ 0.07765632, -0.99658459, -0.02808279,  0.17434133],
 
 TERMINATION_TIME_UPPER_BOUND = 500 # seconds
 
-
+# Global variables
 RGB_IMG = None
 POINT_CLOUD = None
 
@@ -85,7 +86,7 @@ def get_ROI_img(img):
     return img[ROI['y_min']:ROI['y_max'], ROI['x_min']:ROI['x_max']]
 
 
-def capture_target_shape(visual_output):
+def capture_target_shape(visual_output, keyboard, visual_wait):
     if type(RGB_IMG) != np.ndarray or RGB_IMG.shape != (*IMG_SHAPE, 3):
         raise ValueError(f'No valid RGB image data received from camera!')
 
@@ -126,6 +127,7 @@ def capture_target_shape(visual_output):
         cv2.putText(debug_img, 'Target shape', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Target shape')
+        if not visual_wait: keyboard.press(Key.space)
         cv2.waitKey(0)
 
     return {
@@ -137,7 +139,7 @@ def capture_target_shape(visual_output):
     }
 
 
-def capture_current_shape(visual_output):
+def capture_current_shape(visual_output, keyboard, visual_wait):
     ROI_rgb_img = get_ROI_img(RGB_IMG)
 
     # Color filter
@@ -174,6 +176,7 @@ def capture_current_shape(visual_output):
         cv2.putText(debug_img, 'Current shape', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Current dough shape')
+        if not visual_wait: keyboard.press(Key.space)
         cv2.waitKey(0)
     
     return current_shape_contour
@@ -259,9 +262,9 @@ def get_heighest_dough_point():
     return H_ro
 
 
-def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, iteration, start_time, pcl, visual_output):
+def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
     # Calculate the roll start point S (in 2D)
-    current_shape_contour = capture_current_shape(visual_output=False)
+    current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
@@ -377,12 +380,13 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, iou, it
         cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Planned roll trajectory and latest IoU')
+        if not visual_wait: keyboard.press(Key.space)
         cv2.waitKey(0)
     
     return S_ro, E_ro, yaw_SE
 
 
-def calculate_iou(target_shape, visual_output):
+def calculate_iou(target_shape, visual_output, keyboard, visual_wait):
     # Calculate target shape mask
     target_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     if target_shape['type'] != 'circle':
@@ -390,7 +394,7 @@ def calculate_iou(target_shape, visual_output):
     cv2.circle(target_shape_mask, center=target_shape['params']['center'], radius=target_shape['params']['radius'], color=255, thickness=cv2.FILLED)
 
     # Calculate current shape mask
-    current_shape_contour = capture_current_shape(visual_output=False)
+    current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
     current_shape_mask = np.zeros(IMG_SHAPE, dtype="uint8")
     # drawContours would fail if the contour is not closed (i.e. when a part of the dough is out of ROI)
     cv2.fillPoly(current_shape_mask, [current_shape_contour], color=255)
@@ -418,6 +422,7 @@ def calculate_iou(target_shape, visual_output):
         cv2.putText(debug_img, f'IoU = {iou:.2f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.65, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
         cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Intersection over union')
+        if not visual_wait: keyboard.press(Key.space)
         cv2.waitKey(0)
 
     return iou
@@ -439,6 +444,7 @@ def main():
     parser.add_argument('-za', '--z-above', type=float, default=0.15812, help='Height above the base/table immediately before and after rolling.')
     parser.add_argument('-dr', '--disable-robot', action='store_true', default=False, help='Will not send any commands to the robot when set to True.')
     parser.add_argument('-vo', '--visual-output', action='store_true', default=False, help='Show visual output when set to True.')
+    parser.add_argument('-vw', '--visual-wait', action='store_true', default=False, help='Wait for key press to proceed when visual output is enabled.')
     args = parser.parse_args()
     params = vars(args)
 
@@ -450,6 +456,8 @@ def main():
             return iou >= args.termination_value or t > TERMINATION_TIME_UPPER_BOUND
     else:
         raise ValueError(f'Unknown termination condition {args.termination_condition}')
+
+    keyboard = Controller()
 
     #########################
     # Initialize vision
@@ -494,11 +502,11 @@ def main():
             go_to_ready_pose()
 
         # Capture the target dough shape
-        target_shape = capture_target_shape(visual_output=False)
+        target_shape = capture_target_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
         params.update(target_shape)
 
         # Calculate current IoU
-        iou = calculate_iou(target_shape, visual_output=False)
+        iou = calculate_iou(target_shape, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
 
         # Logging
         time_elapsed = time() - start_time
@@ -519,7 +527,7 @@ def main():
         while not terminate(time() - start_time, iou):
 
             # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, iou, iteration, start_time, pcl, args.visual_output)
+            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, iou, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
             print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S]} m')
             print(f'Calculated roll end point E: {[f"{i:.3f}" for i in E]} m')
             print(f'Calculated the angle of the direction S -> E: {yaw_SE * 180 / np.pi:.3f}' + u'\xb0')
@@ -543,7 +551,7 @@ def main():
                 go_to_ready_pose()
 
             # Calculate current IoU
-            iou = calculate_iou(target_shape, visual_output=False)
+            iou = calculate_iou(target_shape, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
 
             # Logging
             time_elapsed = time() - start_time
