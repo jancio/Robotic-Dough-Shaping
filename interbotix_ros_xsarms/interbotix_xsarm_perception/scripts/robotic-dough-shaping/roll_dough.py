@@ -355,11 +355,11 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, current
     # print(S_pc, '- pc2ro ->', S_ro)
     # print(E_pc, '- pc2ro ->', E_ro)
 
-    dough_height = S_ro[2]
-    if dough_height < 0:
-        print(f'Warning: The estimated dough height at the roll start point S is {dough_height:.4f} m. Setting to 0 m.')
-        dough_height = 0
-    print(f'Dough height at roll start point S: {dough_height:.4f} m')
+    dough_height_at_S = S_ro[2]
+    if dough_height_at_S < 0:
+        print(f'Warning: The estimated dough height at the roll start point S is {dough_height_at_S:.4f} m. Setting to 0 m.')
+        dough_height_at_S = 0
+    print(f'Dough height at roll start point S: {dough_height_at_S:.4f} m')
     max_dough_height = np.dot(T_pc2ro, np.array([*H_pc, 1]))[2]
     if max_dough_height < 0:
         print(f'Warning: The estimated maximum dough height is {max_dough_height:.4f} m. Setting to 0 m.')
@@ -368,8 +368,8 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, current
 
     # Set z to the fraction of dough height that is reached at the roll start point
     # Offset by the minimum z value robot can be moved to
-    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height
-    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * dough_height
+    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height_at_S
+    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * dough_height_at_S
 
     S_ro = (S_ro[0], S_ro[1], S_z_ro)
     E_ro = (E_ro[0], E_ro[1], E_z_ro)
@@ -410,7 +410,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, current
         cv2.putText(debug_img, f'IoU = {iou:.3f}', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'Dough height:', (10, 270), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'- max: {max_dough_height:.3f} m', (10, 300), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'- at S: {dough_height:.3f} m', (10, 330), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- at S: {dough_height_at_S:.3f} m', (10, 330), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, 'Roll angle S->E:', (10, 360), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
@@ -418,7 +418,7 @@ def calculate_roll_start_and_end(start_method, end_method, target_shape, current
         if not visual_wait: keyboard.press(Key.space)
         cv2.waitKey(0)
     
-    return S_ro, E_ro, yaw_SE
+    return dough_height_at_S, max_dough_height, S_ro, E_ro, yaw_SE
 
 
 def calculate_iou(target_shape, current_shape_contour, visual_output, keyboard, visual_wait):
@@ -460,6 +460,17 @@ def calculate_iou(target_shape, current_shape_contour, visual_output, keyboard, 
         cv2.waitKey(0)
 
     return iou
+
+
+def evaluate_and_plan(start_method, end_method, target_shape, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
+        # Calculate current shape contour
+        current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
+        # Calculate current IoU
+        iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
+        # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+        dough_height_at_S, max_dough_height, S, E, yaw_SE = calculate_roll_start_and_end(start_method, end_method, target_shape, current_shape_contour, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait)
+
+        return  iou, dough_height_at_S, max_dough_height, S, E, yaw_SE
 
 
 def main():
@@ -548,20 +559,16 @@ def main():
         # First line is a dictionary of parameters
         csv_writer.writerow([json.dumps(params)])
         # Second line is the header
-        csv_writer.writerow(['Iteration', 'Time', 'IoU'])
+        csv_writer.writerow(['Iteration', 'Time (s)', 'IoU', 'Dough height at S (m)', 'Max dough height (m)'])
 
-        # Calculate current shape contour
-        current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-        # Calculate current IoU
-        iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-        # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-        S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, current_shape_contour, iou, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+        # Evaluate and plan: calculate current shape contour, evaluate IoU, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+        iou, dough_height_at_S, max_dough_height, S, E, yaw_SE = evaluate_and_plan(args.start_method, args.end_method, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
 
         # Logging
         time_elapsed = time() - start_time
         print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
         print('=' * 120)
-        csv_writer.writerow([iteration, time_elapsed, iou])
+        csv_writer.writerow([iteration, time_elapsed, iou, dough_height_at_S, max_dough_height])
 
         #########################
         # Iterative procedure
@@ -587,18 +594,14 @@ def main():
                 # Move to ReadyPose
                 go_to_ready_pose()
 
-            # Calculate current shape contour
-            current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-            # Calculate current IoU
-            iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-            # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            S, E, yaw_SE = calculate_roll_start_and_end(args.start_method, args.end_method, target_shape, current_shape_contour, iou, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+            # Evaluate and plan: calculate current shape contour, evaluate IoU, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+            iou, dough_height_at_S, max_dough_height, S, E, yaw_SE = evaluate_and_plan(args.start_method, args.end_method, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
 
             # Logging
             time_elapsed = time() - start_time
             print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
             print('=' * 120)
-            csv_writer.writerow([iteration, time_elapsed, iou])
+            csv_writer.writerow([iteration, time_elapsed, iou, dough_height_at_S, max_dough_height])
 
             iteration += 1
 
