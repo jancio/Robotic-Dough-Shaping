@@ -480,7 +480,7 @@ def calculate_roll_start_and_end(params, current_shape_contour, iou, max_dough_h
         cv2.putText(debug_img, f'Method:', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'- {params["start_method"]}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'- end at {params["end_method"]}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'- shrink {"enabled" if params["enable_shrink"] else "disabled"}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- {("side shrink" if params["side_shrink"] else "forward shrink") if params["enable_shrink"] else "shrink disabled"}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'Iteration: {iteration:6d}', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'Time:  {(time() - params["start_time"]):7.1f} s', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.line(debug_img, (10, 190), (155, 190), color=(150, 150, 150), thickness=1)
