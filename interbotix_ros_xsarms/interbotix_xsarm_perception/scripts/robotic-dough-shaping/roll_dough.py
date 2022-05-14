@@ -346,23 +346,23 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         #     Calculate the roll end point E (in 2D)
         #     Correct the start point S (in 2D)
         if furthest_outside_pt is not None:
-            do_shrink = True
-            print(f'Current dough shape exceeds the target shape! => Applying the SHRINK action')
-
             # Set the end point E_im to a point on the line furthest_outside_pt->C at the distance |S_im,C| from furthest_outside_pt
             u = (C - furthest_outside_pt) / np.linalg.norm(C - furthest_outside_pt)
             dist = np.linalg.norm(C - S_im)
-            E_im = furthest_outside_pt + dist*u
-            E_im = E_im.astype(int)
-            # Alternative: Set the end point E_im in the direction S_im->C at the distance |S_im,C| from furthest_outside_pt
-            # E_im = furthest_outside_pt + (C - S_im)
+            if dist > 4*SHRINK_PIXEL_TOLERANCE:
+                do_shrink = True
+                print(f'Current dough shape exceeds the target shape! => Applying the SHRINK action')
+                E_im = furthest_outside_pt + dist*u
+                E_im = E_im.astype(int)
+                # Alternative: Set the end point E_im in the direction S_im->C at the distance |S_im,C| from furthest_outside_pt
+                # E_im = furthest_outside_pt + (C - S_im)
 
-            # Correct the start point for shrink action
-            S_im = furthest_outside_pt
+                # Correct the start point for shrink action
+                S_im = furthest_outside_pt
 
-            # Transform from image to 2D point cloud coordinates
-            S_pc = np.dot(T_im2pc, np.array([*furthest_outside_pt, 1]))[:2]
-            depth_pc = MAX_DEPTH
+                # Transform from image to 2D point cloud coordinates
+                S_pc = np.dot(T_im2pc, np.array([*furthest_outside_pt, 1]))[:2]
+                depth_pc = MAX_DEPTH
 
     # Calculate the roll end point E (in 2D) when shrink action is disabled or current shape is entirely inside of the target shape
     if not do_shrink:
