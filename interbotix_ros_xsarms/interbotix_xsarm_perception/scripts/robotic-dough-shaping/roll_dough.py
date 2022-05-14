@@ -314,18 +314,17 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         
     elif start_method == 'centroid-3d':
         # If the point cloud filter is not tuned, need to filter out points outside of current_shape_contour
-        # *S_pc, depth_pc = calculate_centroid_3d(current_shape_contour)
-        *S_pc, depth_pc = calculate_centroid_3d()
+        *S_pc, depth_pc = calculate_centroid_3d(roi=current_shape_contour)
 
         # Transform from 2D point cloud to image coordinates
-        S_im = np.dot(T_pc2im, np.array([*S_pc, 1]))[:2]
+        S_im = np.dot(T_pc2im, np.array([*S_pc, 1])).astype(int)[:2]
         # print(S_pc, '- pc2im ->', S_im)
 
     elif start_method == 'highest-point':
         *S_pc, depth_pc = H_pc
 
         # Transform from 2D point cloud to image coordinates
-        S_im = np.dot(T_pc2im, np.array([*S_pc, 1]))[:2]
+        S_im = np.dot(T_pc2im, np.array([*S_pc, 1])).astype(int)[:2]
         # print(S_pc, '- pc2im ->', S_im)
 
     # When shrink action is enabled
