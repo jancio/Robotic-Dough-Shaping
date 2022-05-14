@@ -1,6 +1,6 @@
 ##################################################################################################################################
 # Robotic Dough Shaping - Main file
-#   Project for Robot Manipulation (CS 6751), Cornell University, May 2022
+#   Project for Robot Manipulation (CS 6751), Cornell University, Spring 2022
 ##################################################################################################################################
 # Authors: 
 #   Janko Ondras (jo951030@gmail.com)
@@ -62,7 +62,6 @@ Z_MIN = 0.06 # prev contact value = 0.065 meters
 # Maximum depth in point cloud coordinates
 MAX_DEPTH = 0.60100262777 # TODO: might need to check 0.60642844 inverse
 
-SHRINK_WITH_EDGE = True
 ROLLING_PIN_WIDTH = 0.061   # meters
 ROLLING_PIN_RADIUS = 0.017  # meters
 SHRINK_HEIGHT_OFFSET = 0.02 # meters
@@ -314,7 +313,11 @@ def calculate_max_dough_height_and_point():
     return max_dough_height, highest_dough_pt_pc
 
 
-def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target_shape, current_shape_contour, iou, max_dough_height, highest_dough_pt_pc, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
+def calculate_roll_start_and_end(start_method, end_method, enable_shrink, side_shrink, 
+                                 target_shape, current_shape_contour, 
+                                 iou, max_dough_height, highest_dough_pt_pc, 
+                                 iteration, start_time, pcl, 
+                                 visual_output, keyboard, visual_wait):
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
@@ -434,7 +437,7 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         # Offset the start and end point by the rolling pin radius/width
         # This is not shown in the visual output!
         u = (E_ro[:2] - S_ro[:2]) / np.linalg.norm(E_ro[:2] - S_ro[:2])
-        dist = ROLLING_PIN_WIDTH/2 if SHRINK_WITH_EDGE else ROLLING_PIN_RADIUS
+        dist = ROLLING_PIN_WIDTH/2 if side_shrink else ROLLING_PIN_RADIUS
         S_ro[:2] = S_ro[:2] - dist*u
         E_ro[:2] = E_ro[:2] - dist*u
 
@@ -451,7 +454,7 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
     yaw_SE = np.arctan((E_ro[1] - S_ro[1]) / (E_ro[0] - S_ro[0]))
 
     # Change rotation of the rolling pin by 90 degrees if shrinking with edge
-    if do_shrink and SHRINK_WITH_EDGE:
+    if do_shrink and side_shrink:
         yaw_SE = yaw_SE - (np.pi/2) if yaw_SE > 0 else yaw_SE + (np.pi/2)
 
     print(f'Calculated roll start point S: {[f"{i:.3f}" for i in S_ro]} m')
@@ -540,14 +543,18 @@ def calculate_iou(target_shape, current_shape_contour, visual_output, keyboard, 
     return iou
 
 
-def evaluate_and_plan(start_method, end_method, enable_shrink, target_shape, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
+def evaluate_and_plan(start_method, end_method, enable_shrink, side_shrink, target_shape, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
         # Calculate current shape contour
         current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
         # Calculate current IoU
         iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
         max_dough_height, highest_dough_pt_pc = calculate_max_dough_height_and_point()
         # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-        plan_result = calculate_roll_start_and_end(start_method, end_method, enable_shrink, target_shape, current_shape_contour, iou, max_dough_height, highest_dough_pt_pc, iteration, start_time, pcl, visual_output, keyboard, visual_wait)
+        plan_result = calculate_roll_start_and_end(start_method, end_method, enable_shrink, side_shrink, 
+                                                   target_shape, current_shape_contour, 
+                                                   iou, max_dough_height, highest_dough_pt_pc, 
+                                                   iteration, start_time, pcl, 
+                                                   visual_output, keyboard, visual_wait)
 
         return  iou, max_dough_height, plan_result
 
@@ -563,7 +570,8 @@ def main():
                         help='Choose the roll start point calculation method from: "centroid-2d", "centroid-3d", and "highest-point"')
     parser.add_argument('-em', '--end-method', type=str, required=True, choices=['current', 'target'],
                         help='Choose the roll end point calculation method from: "current" (current shape outline), "target" (target shape outline)')
-    parser.add_argument('-es', '--enable-shrink', action='store_true', default=False, help='Shrink dough to the target shape area when it expands outside of the target shape.')               
+    parser.add_argument('-es', '--enable-shrink', action='store_true', default=False, help='Shrink dough to the target shape area when it expands outside of the target shape.')
+    parser.add_argument('-ss', '--side-shrink', action='store_true', default=False, help='Perform the shrink action with the side edge of the rolling pin. Otherwise, use the forward edge as for the expand action. Applicable only when shrinking is enabled.')               
     parser.add_argument('-tc', '--termination-condition', type=str, default='time', choices=['time', 'iou'], help='Choose either "time" or "iou" termination condition.')
     parser.add_argument('-tv', '--termination-value', type=float, default=10., help='Either maximum time in seconds or minimum IoU based on the termination-condition argument.')
     parser.add_argument('-ld', '--log-dir', type=str, default='./logs', help='Path to directory where to save logs (relative to this file).') 
@@ -610,6 +618,7 @@ def main():
 
     iteration = 0
     start_time = time()
+    params['start_time'] = start_time
 
     # Move to ReadyPose
     if not args.disable_robot:
@@ -617,7 +626,7 @@ def main():
 
     # Capture the target dough shape
     target_shape = capture_target_shape(visual_output=False, keyboard=keyboard, visual_wait=args.visual_wait)
-    params.update(target_shape)
+    params['target_shape'] = target_shape
 
     #########################
     # Setup logging
@@ -644,7 +653,7 @@ def main():
         csv_writer.writerow(['Iteration', 'Time (s)', 'IoU', 'Max dough height (m)', 'Dough height at S (m)'])
 
         # Evaluate and plan: calculate current shape contour, evaluate IoU, calculate maximum dough height, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-        iou, max_dough_height, plan_result = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+        iou, max_dough_height, plan_result = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, args.side_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
         if plan_result is None:
             raise ValueError(f'Failed to make a plan!')
         dough_height_at_S, S, E, yaw_SE = plan_result
@@ -680,7 +689,7 @@ def main():
                 go_to_ready_pose()
 
             # Evaluate and plan: calculate current shape contour, evaluate IoU, calculate maximum dough height, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            iou, max_dough_height, plan_result = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+            iou, max_dough_height, plan_result = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, args.side_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
             if plan_result is not None:
                 dough_height_at_S, S, E, yaw_SE = plan_result
 
