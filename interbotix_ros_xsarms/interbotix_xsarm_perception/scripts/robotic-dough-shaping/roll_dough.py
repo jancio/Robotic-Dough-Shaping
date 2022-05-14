@@ -57,9 +57,11 @@ Z_MIN = 0.06 # prev contact value = 0.065 meters
 # Maximum depth in point cloud coordinates
 MAX_DEPTH = 0.60100262777 # TODO: might need to check 0.60642844 inverse
 
-SHRINK_WITH_EDGE = False
-ROLLING_PIN_WIDTH = 0.06 # meters # TODO check
-ROLLING_PIN_RADIUS = 0.017 # meters
+SHRINK_WITH_EDGE = True
+ROLLING_PIN_WIDTH = 0.061   # meters
+ROLLING_PIN_RADIUS = 0.017  # meters
+SHRINK_HEIGHT_OFFSET = 0.02 # meters
+SHRINK_PIXEL_TOLERANCE = 2  # 2 pixels (corresponds to about 2 mm which is the width of the target shape outline)
 
 # Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
 T_pc2ro = np.array([[ 0.08870469, -0.9955393 , -0.03213995,  0.175572                ],
@@ -335,7 +337,7 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         furthest_outside_pt_dist_squared = 0
         for P in current_shape_contour[:, 0]:
             dist_CP_squared = sum(np.square(P - C))
-            if dist_CP_squared > R * R:
+            if dist_CP_squared > (R + SHRINK_PIXEL_TOLERANCE)**2:
                 if furthest_outside_pt_dist_squared < dist_CP_squared:
                     furthest_outside_pt = P
                     furthest_outside_pt_dist_squared = dist_CP_squared
@@ -351,6 +353,7 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
             u = (C - furthest_outside_pt) / np.linalg.norm(C - furthest_outside_pt)
             dist = np.linalg.norm(C - S_im)
             E_im = furthest_outside_pt + dist*u
+            E_im = E_im.astype(int)
             # Alternative: Set the end point E_im in the direction S_im->C at the distance |S_im,C| from furthest_outside_pt
             # E_im = furthest_outside_pt + (C - S_im)
 
@@ -394,18 +397,6 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
     # print(S_pc, '- pc2ro ->', S_ro)
     # print(E_pc, '- pc2ro ->', E_ro)
 
-    if do_shrink:
-        # Set z coordinate to touch the base
-        S_ro[2] = 0
-        E_ro[2] = 0
-
-        # Offset the start and end point by the rolling pin radius/width
-        # This is not shown in the visual output!
-        u = (E_ro[:2] - S_ro[:2]) / np.linalg.norm(E_ro - S_ro)
-        dist = ROLLING_PIN_WIDTH/2 if SHRINK_WITH_EDGE else ROLLING_PIN_RADIUS
-        S_ro = S_ro - dist*u
-        E_ro = E_ro - dist*u
-
     dough_height_at_S = S_ro[2]
     if dough_height_at_S < 0:
         print(f'Warning: The estimated dough height at the roll start point S is {dough_height_at_S:.4f} m. Setting to 0 m.')
@@ -417,10 +408,22 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         max_dough_height = 0
     print(f'Maximum dough height: {max_dough_height:.4f} m')
 
+    height = dough_height_at_S
+    if do_shrink:
+        # Set z coordinate to touch the base
+        height = SHRINK_HEIGHT_OFFSET
+
+        # Offset the start and end point by the rolling pin radius/width
+        # This is not shown in the visual output!
+        u = (E_ro[:2] - S_ro[:2]) / np.linalg.norm(E_ro[:2] - S_ro[:2])
+        dist = ROLLING_PIN_WIDTH/2 if SHRINK_WITH_EDGE else ROLLING_PIN_RADIUS
+        S_ro[:2] = S_ro[:2] - dist*u
+        E_ro[:2] = E_ro[:2] - dist*u
+
     # Set z to the fraction of dough height that is reached at the roll start point
     # Offset by the minimum z value robot can be moved to
-    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * dough_height_at_S
-    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * dough_height_at_S
+    S_z_ro = Z_MIN + DOUGH_HEIGHT_START_POINT_CONTRACTION_RATIO * height
+    E_z_ro = Z_MIN + DOUGH_HEIGHT_END_POINT_CONTRACTION_RATIO * height
 
     S_ro = (S_ro[0], S_ro[1], S_z_ro)
     E_ro = (E_ro[0], E_ro[1], E_z_ro)
