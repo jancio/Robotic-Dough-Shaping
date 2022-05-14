@@ -298,25 +298,29 @@ def get_dough_depth(pt):
     return depth
 
 
-def get_heighest_dough_point():
-    # Get highest dough point in 3D point cloud coordinates
-
+def calculate_max_dough_height_and_point():
     if len(POINT_CLOUD) == 0:
         raise ValueError(f'No valid point cloud data received from camera!')
 
-    # Find the highest point in the point cloud (in terms of z)
-    H_pc = sorted(POINT_CLOUD, key=lambda pt: pt[2])[0]
+    # Get highest dough point in 3D point cloud coordinates
+    highest_dough_pt_pc = sorted(POINT_CLOUD, key=lambda pt: pt[2])[0]
 
-    return H_pc
+    max_dough_height = np.dot(T_pc2ro, np.array([*highest_dough_pt_pc, 1]))[2]
+    if max_dough_height < 0:
+        print(f'Warning: The estimated maximum dough height is {max_dough_height:.4f} m. Setting to 0 m.')
+        max_dough_height = 0
+    print(f'Maximum dough height: {max_dough_height:.4f} m')
+
+    return max_dough_height, highest_dough_pt_pc
 
 
-def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target_shape, current_shape_contour, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
+def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target_shape, current_shape_contour, iou, max_dough_height, highest_dough_pt_pc, iteration, start_time, pcl, visual_output, keyboard, visual_wait):
     # pcl_clusters_detected, pcl_clusters = pcl.get_cluster_positions(ref_frame="wx250s/base_link", sort_axis="x", reverse=True)
     # if pcl_clusters_detected:
     #     S = pcl_clusters[0]['position']
     # else:
     #     S = (*calculate_centroid_2d(current_shape_contour), 0.01)
-    H_pc = get_heighest_dough_point()
+    H_pc = highest_dough_pt_pc
     C = np.array(target_shape['params']['center'])
     R = target_shape['params']['radius']
 
@@ -403,7 +407,8 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
                         E_im = intersection.astype(int)
 
         if E_im is None:
-            raise ValueError(f'No suitable roll end point E found!')
+            print(f'No suitable roll end point E found! The dough might be already covering the whole target shape.')
+            return None
 
     # Transform from image to 2D point cloud coordinates
     E_pc = np.dot(T_im2pc, np.array([*E_im, 1]))[:2]
@@ -420,11 +425,6 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         print(f'Warning: The estimated dough height at the roll start point S is {dough_height_at_S:.4f} m. Setting to 0 m.')
         dough_height_at_S = 0
     print(f'Dough height at roll start point S: {dough_height_at_S:.4f} m')
-    max_dough_height = np.dot(T_pc2ro, np.array([*H_pc, 1]))[2]
-    if max_dough_height < 0:
-        print(f'Warning: The estimated maximum dough height is {max_dough_height:.4f} m. Setting to 0 m.')
-        max_dough_height = 0
-    print(f'Maximum dough height: {max_dough_height:.4f} m')
 
     height = dough_height_at_S
     if do_shrink:
@@ -474,28 +474,29 @@ def calculate_roll_start_and_end(start_method, end_method, enable_shrink, target
         # Draw the planned roll path
         cv2.arrowedLine(debug_img, tuple(S_im), tuple(E_im), color=(0, 0, 0), thickness=2, tipLength=0.3)
         # Draw text
-        cv2.rectangle(debug_img, (5, 5), (165, 430), color=(255, 255, 255), thickness=cv2.FILLED)
+        cv2.rectangle(debug_img, (5, 5), (165, 460), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, f'Method:', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'- {start_method}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'- shrink {"enabled" if enable_shrink else "disabled"}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'Iteration: {iteration:6d}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'Time:  {(time() - start_time):7.1f} s', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.line(debug_img, (10, 160), (155, 160), color=(150, 150, 150), thickness=1)
-        cv2.putText(debug_img, 'ROI', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Target shape', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Current shape', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'IoU = {iou:.3f}', (10, 270), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'Dough height:', (10, 300), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'- max: {max_dough_height:.3f} m', (10, 330), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'- at S: {dough_height_at_S:.3f} m', (10, 360), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, 'Roll angle S->E:', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 420), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- end at {end_method}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- shrink {"enabled" if enable_shrink else "disabled"}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Iteration: {iteration:6d}', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Time:  {(time() - start_time):7.1f} s', (10, 180), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.line(debug_img, (10, 190), (155, 190), color=(150, 150, 150), thickness=1)
+        cv2.putText(debug_img, 'ROI', (10, 210), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Target shape', (10, 240), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 255), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Current shape', (10, 270), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(255, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'IoU = {iou:.3f}', (10, 300), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'Dough height:', (10, 330), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- max: {max_dough_height:.3f} m', (10, 360), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- at S: {dough_height_at_S:.3f} m', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, 'Roll angle', (10, 420), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 450), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.imshow(WINDOW_ID, debug_img)
-        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Planned roll trajectory and latest IoU')
+        cv2.setWindowTitle(WINDOW_ID, WINDOW_ID + ' - Planned roll trajectory')
         if not visual_wait: keyboard.press(Key.space)
         cv2.waitKey(0)
     
-    return dough_height_at_S, max_dough_height, S_ro, E_ro, yaw_SE
+    return dough_height_at_S, S_ro, E_ro, yaw_SE
 
 
 def calculate_iou(target_shape, current_shape_contour, visual_output, keyboard, visual_wait):
@@ -544,10 +545,11 @@ def evaluate_and_plan(start_method, end_method, enable_shrink, target_shape, ite
         current_shape_contour = capture_current_shape(visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
         # Calculate current IoU
         iou = calculate_iou(target_shape, current_shape_contour, visual_output=False, keyboard=keyboard, visual_wait=visual_wait)
+        max_dough_height, highest_dough_pt_pc = calculate_max_dough_height_and_point()
         # Calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-        dough_height_at_S, max_dough_height, S, E, yaw_SE = calculate_roll_start_and_end(start_method, end_method, enable_shrink, target_shape, current_shape_contour, iou, iteration, start_time, pcl, visual_output, keyboard, visual_wait)
+        plan_result = calculate_roll_start_and_end(start_method, end_method, enable_shrink, target_shape, current_shape_contour, iou, max_dough_height, highest_dough_pt_pc, iteration, start_time, pcl, visual_output, keyboard, visual_wait)
 
-        return  iou, dough_height_at_S, max_dough_height, S, E, yaw_SE
+        return  iou, max_dough_height, plan_result
 
 
 def main():
@@ -639,22 +641,25 @@ def main():
         # First line is a dictionary of parameters
         csv_writer.writerow([json.dumps(params)])
         # Second line is the header
-        csv_writer.writerow(['Iteration', 'Time (s)', 'IoU', 'Dough height at S (m)', 'Max dough height (m)'])
+        csv_writer.writerow(['Iteration', 'Time (s)', 'IoU', 'Max dough height (m)', 'Dough height at S (m)'])
 
-        # Evaluate and plan: calculate current shape contour, evaluate IoU, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-        iou, dough_height_at_S, max_dough_height, S, E, yaw_SE = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+        # Evaluate and plan: calculate current shape contour, evaluate IoU, calculate maximum dough height, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+        iou, max_dough_height, plan_result = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+        if plan_result is None:
+            raise ValueError(f'Failed to make a plan!')
+        dough_height_at_S, S, E, yaw_SE = plan_result
 
         # Logging
         time_elapsed = time() - start_time
-        print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
+        print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}\t Maximum dough height: {max_dough_height:.4f} m\t Dough height at S: {dough_height_at_S:.4f} m')
         print('=' * 120)
-        csv_writer.writerow([iteration, time_elapsed, iou, dough_height_at_S, max_dough_height])
+        csv_writer.writerow([iteration, time_elapsed, iou, max_dough_height, dough_height_at_S])
 
         #########################
         # Iterative procedure
         #########################
         iteration = 1
-        while not terminate(time() - start_time, iou):
+        while plan_result is not None and not terminate(time() - start_time, iou):
 
             if not args.disable_robot:
 
@@ -674,14 +679,16 @@ def main():
                 # Move to ReadyPose
                 go_to_ready_pose()
 
-            # Evaluate and plan: calculate current shape contour, evaluate IoU, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
-            iou, dough_height_at_S, max_dough_height, S, E, yaw_SE = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+            # Evaluate and plan: calculate current shape contour, evaluate IoU, calculate maximum dough height, and calculate the roll start point S, the roll end point E, and the angle of the direction S -> E
+            iou, max_dough_height, plan_result = evaluate_and_plan(args.start_method, args.end_method, args.enable_shrink, target_shape, iteration, start_time, pcl, args.visual_output, keyboard, args.visual_wait)
+            if plan_result is not None:
+                dough_height_at_S, S, E, yaw_SE = plan_result
 
             # Logging
             time_elapsed = time() - start_time
-            print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}')
+            print(f'Iteration: {iteration:7d}\t Time: {time_elapsed:5.3f} s\t IoU: {iou:.3f}\t Maximum dough height: {max_dough_height:.4f} m\t Dough height at S: {dough_height_at_S:.4f} m')
             print('=' * 120)
-            csv_writer.writerow([iteration, time_elapsed, iou, dough_height_at_S, max_dough_height])
+            csv_writer.writerow([iteration, time_elapsed, iou, max_dough_height, dough_height_at_S])
 
             iteration += 1
 

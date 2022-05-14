@@ -155,6 +155,7 @@ def main():
     key = "a"
 
     enable_shrink = False
+    end_method = 'target'
 
     # keyboard.press(key)
 
@@ -163,10 +164,11 @@ def main():
         cv2.rectangle(debug_img, (5, 5), (165, 400), color=(255, 255, 255), thickness=cv2.FILLED)
         cv2.putText(debug_img, f'Method:', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'- {method}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'- shrink {"enabled" if enable_shrink else "disabled"}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- end at {end_method}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        cv2.putText(debug_img, f'- shrink {"enabled" if enable_shrink else "disabled"}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
 
         # cv2.putText(debug_img, f'Iteration: {iteration:6d}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
-        cv2.putText(debug_img, f'Time:  {time_elapsed:7.1f} s', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+        # cv2.putText(debug_img, f'Time:  {time_elapsed:7.1f} s', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
         cv2.line(debug_img, (10, 130), (155, 130), color=(150, 150, 150), thickness=1)
 
         cv2.putText(debug_img, 'ROI', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
@@ -180,7 +182,7 @@ def main():
         cv2.putText(debug_img, 'Roll angle S->E:', (10, 360), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=2, lineType=cv2.LINE_AA)
         cv2.putText(debug_img, f'{yaw_SE * 180 / np.pi:11.2f} deg', (10, 390), cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.55, color=(0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
 
-        cv2.imshow('color image', debug_img)
+        cv2.imshow(' - Current state & Planned roll trajectory', debug_img)
 
         # keyboard.press(Key.space)
         cv2.waitKey(0)
