@@ -1,5 +1,10 @@
 ##################################################################################################################################
 # Robotic Dough Shaping - Main file
+#   Project for Robot Manipulation (CS 6751), Cornell University, May 2022
+##################################################################################################################################
+# Authors: 
+#   Janko Ondras (jo951030@gmail.com)
+#   Zeqi Gu (contributed to circle detection and color filtering)
 ##################################################################################################################################
 # Instructions:
 #   First, run: roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
@@ -251,19 +256,32 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
     if delta > EPS:
         # No intersecion points
         return None
+
     elif abs(delta) < EPS:
         # One intersection point
         # Undo initial translation to origin
         return np.array([x0, y0]) + cc
+
     else:
         # Two intersection points
         mult = np.sqrt((r*r - c*c/a2b2) / a2b2)
         i1 = np.array([x0 + b*mult, y0 - a*mult])
         i2 = np.array([x0 - b*mult, y0 + a*mult])
-        # Get the intersection in the direction p1->p2 of the intended roll
-        intersection = i1 if (i1[0] - x1) * (x2 - x1) > 0 and (i1[1] - y1) * (y2 - y1) > 0 else i2
+
+        # Get only the intersections in the direction p1->p2 of the intended roll and further from p1 than |p1,p2|
+        # If both intersections satisfy this condition, take the one further from p1
+        dist_p1p2 = np.linalg.norm(p2 - p1)
+        intersection = None
+        max_dist_p1i = 0
+        for i in [i1, i2]:
+            if (i[0] - x1) * (x2 - x1) > 0 and (i[1] - y1) * (y2 - y1) > 0:
+                dist_p1i = np.linalg.norm(i - p1)
+                if dist_p1i  > dist_p1p2 and dist_p1i > max_dist_p1i:
+                    max_dist_p1i = dist_p1i
+                    intersection = i
+
         # Undo initial translation to origin
-        return intersection + cc
+        return intersection + cc if intersection is not None else None
 
 
 def get_dough_depth(pt):
