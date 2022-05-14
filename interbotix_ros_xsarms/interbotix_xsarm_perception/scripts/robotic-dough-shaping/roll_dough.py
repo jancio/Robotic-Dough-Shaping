@@ -40,7 +40,7 @@ ROI = {
     'y_max': 320    # pixels
 }
 # Target shape detection parameters
-MIN_TARGET_CIRCLE_RADIUS = 50   # pixels (50 pixels => only circles with diameters 4 inch or more will be detected)
+MIN_TARGET_CIRCLE_RADIUS = 40   # pixels for 3.5 inch (50 pixels => only circles with diameters 4 inch or more will be detected)
 MAX_TARGET_CIRCLE_RADIUS = 180  # pixels
 # Current shape detection parameters
 MIN_COLOR_INTENSITY = 70
@@ -90,9 +90,8 @@ def rgb_img_callback(ros_msg):
 
 
 def point_cloud_callback(ros_msg):
-    # Generator
     global POINT_CLOUD
-    POINT_CLOUD = point_cloud2.read_points(ros_msg, skip_nans=True, field_names=('x', 'y', 'z'))
+    POINT_CLOUD = point_cloud2.read_points_list(ros_msg, skip_nans=True, field_names=('x', 'y', 'z'))
 
 
 def get_ROI_img(img):
@@ -203,11 +202,11 @@ def calculate_centroid_2d(contour):
 
 
 def calculate_centroid_3d(roi=None):
-    if type(POINT_CLOUD) != GeneratorType:
+    if len(POINT_CLOUD) == 0:
         raise ValueError(f'No valid point cloud data received from camera!')
 
     if roi is None:
-        return np.mean(list(POINT_CLOUD), axis=0)
+        return np.mean(POINT_CLOUD, axis=0)
 
     # If the point cloud filter is not tuned, need to filter out points outside of region of interest (current shape contour)
     #     Create boolean mask from current_shape_contour
@@ -268,12 +267,11 @@ def calculate_circle_line_intersection(cc, r, p1, p2):
 def get_dough_depth(pt):
     # Get dough depth in point cloud coordinates in the proximity of a given point in 2D point cloud coordinates
 
-    if type(POINT_CLOUD) != GeneratorType:
+    if len(POINT_CLOUD) == 0:
         raise ValueError(f'No valid point cloud data received from camera!')
     
     # Find k closest points in the point cloud (in terms of x and y) and get their average distance from camera
-    # point_cloud_arr = np.fromiter(POINT_CLOUD, dtype=np.dtype(float, (3,)))
-    point_cloud_arr = np.array(list(POINT_CLOUD))
+    point_cloud_arr = np.array(POINT_CLOUD)
     _, idx = KDTree(point_cloud_arr[:, :2]).query([pt], k=3)
     depth = np.mean(point_cloud_arr[idx][0, :, 2])
 
@@ -283,9 +281,9 @@ def get_dough_depth(pt):
 def get_heighest_dough_point():
     # Get highest dough point in 3D point cloud coordinates
 
-    if type(POINT_CLOUD) != GeneratorType:
+    if len(POINT_CLOUD) == 0:
         raise ValueError(f'No valid point cloud data received from camera!')
-    
+
     # Find the highest point in the point cloud (in terms of z)
     H_pc = sorted(POINT_CLOUD, key=lambda pt: pt[2])[0]
 
