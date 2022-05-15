@@ -24,21 +24,52 @@ python3 sense_force.py -ni 2
 
 ----------------------------------------------------------------------------------
 # Experiment 1 [exp01] - compare 3 materials across 3 start methods
-#                      - target shape=4, end method=target, shrink=enabled
+#                      - target shape=4, end method=target, shrink=disabled
 ----------------------------------------------------------------------------------
 
-material=
-python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
-python3 roll_dough.py -m play-doh -sm centroid-3d -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
-python3 roll_dough.py -m play-doh -sm highest-point -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m play-doh -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m play-doh -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
 
-python3 roll_dough.py -m plasticine -sm centroid-2d -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
-python3 roll_dough.py -m plasticine -sm centroid-3d -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
-python3 roll_dough.py -m plasticine -sm highest-point -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
+python3 roll_dough.py -m plasticine -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m plasticine -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m plasticine -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
 
-python3 roll_dough.py -m kinetic-sand -sm centroid-2d -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
-python3 roll_dough.py -m kinetic-sand -sm centroid-3d -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
-python3 roll_dough.py -m kinetic-sand -sm highest-point -em target -tc time -tv 300 -vo -es -ld ./logs/exp01
+python3 roll_dough.py -m kinetic-sand -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m kinetic-sand -sm centroid-3d -em target -tc time -tv 300 -vo -ld ./logs/exp01
+python3 roll_dough.py -m kinetic-sand -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
+
+
+----------------------------------------------------------------------------------
+# Experiment 2 [exp02] - compare shrink enabled (2 conditions) vs. disabled
+#                      - target shape (smallest), material, start method, end method fixed
+----------------------------------------------------------------------------------
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -es -tc time -tv 300 -vo -ld ./logs/exp02
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp02
+
+----------------------------------------------------------------------------------
+# Experiment 3 [exp03] - compare 2 end methods across 3 target shape sizes
+#                      - target shape, material, start method fixed
+----------------------------------------------------------------------------------
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp03
+
+python3 roll_dough.py -m play-doh -sm centroid-2d -em current -tc time -tv 300 -vo -ld ./logs/exp03
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ----------------------------------------------------------------------------------
 # Experiment 2 [exp02] - compare 3 start methods across 3 target shape sizes

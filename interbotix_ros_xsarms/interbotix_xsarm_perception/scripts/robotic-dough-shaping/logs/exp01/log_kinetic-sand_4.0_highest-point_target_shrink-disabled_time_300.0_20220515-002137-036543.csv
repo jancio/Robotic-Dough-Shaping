@@ -1,0 +1,7 @@
+"{""material"": ""kinetic-sand"", ""start_method"": ""highest-point"", ""end_method"": ""target"", ""enable_shrink"": false, ""side_shrink"": false, ""termination_condition"": ""time"", ""termination_value"": 300.0, ""log_dir"": ""./logs/exp01"", ""z_above"": 0.15812, ""disable_robot"": false, ""visual_output"": true, ""visual_wait"": false, ""start_time"": 1652588496.414302, ""target_shape"": {""type"": ""circle"", ""params"": {""center"": [362, 222], ""radius"": 51}}, ""preparation_time"": 0.6225275993347168}"
+Iteration,Time (s),IoU,Max dough height (m),Dough height at S (m)
+0,2.9759836196899414,0.30441698274807294,0.020388163664722292,0.020388163664722292
+1,9.961418628692627,0.5380595319245626,0.017193113664355497,0.017193113664355497
+2,16.917832136154175,0.4812358019082235,0.016643603220807823,0.016643603220807823
+3,23.848148345947266,0.45843289115926505,0.017556420746176915,0.017556420746176915
+4,30.78900671005249,0.39749012972363224,0.016169856168684937,0.016169856168684937

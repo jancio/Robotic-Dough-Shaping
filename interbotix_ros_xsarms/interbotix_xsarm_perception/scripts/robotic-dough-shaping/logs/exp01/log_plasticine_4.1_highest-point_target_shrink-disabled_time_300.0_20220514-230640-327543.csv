@@ -1,0 +1,7 @@
+"{""material"": ""plasticine"", ""start_method"": ""highest-point"", ""end_method"": ""target"", ""enable_shrink"": false, ""side_shrink"": false, ""termination_condition"": ""time"", ""termination_value"": 300.0, ""log_dir"": ""./logs/exp01"", ""z_above"": 0.15812, ""disable_robot"": false, ""visual_output"": true, ""visual_wait"": false, ""start_time"": 1652583999.6975725, ""target_shape"": {""type"": ""circle"", ""params"": {""center"": [360, 222], ""radius"": 52}}, ""preparation_time"": 0.6302452087402344}"
+Iteration,Time (s),IoU,Max dough height (m),Dough height at S (m)
+0,1.195436716079712,0.29916441096857715,0.018969414416830643,0.018969414416830643
+1,8.10988163948059,0.30340120042367896,0.019888041003086943,0.019888041003086943
+2,18.035127639770508,0.3227021301635872,0.01974410853265174,0.01974410853265174
+3,24.953969955444336,0.09766350571903412,0.01916476709162296,0.01916476709162296
+4,32.04811453819275,0.11645794300364856,0.01831258200845176,0.01831258200845176
