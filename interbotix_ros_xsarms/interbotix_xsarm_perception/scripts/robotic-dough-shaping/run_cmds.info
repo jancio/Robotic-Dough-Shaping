@@ -21,6 +21,7 @@ python3 sense_force.py -ni 2
 # Experiments
 
 # For all: terminate after 300 s
+# Repeat each 3x
 
 ----------------------------------------------------------------------------------
 # Experiment 1 [exp01] - compare 3 materials across 3 start methods
@@ -41,13 +42,14 @@ python3 roll_dough.py -m kinetic-sand -sm highest-point -em target -tc time -tv 
 
 
 ----------------------------------------------------------------------------------
-# Experiment 2 [exp02] - compare shrink enabled (2 conditions) vs. disabled
-#                      - target shape (smallest), material, start method, end method fixed
+# Experiment 2 [exp02] - compare 2 roll end point methods
+#                      - target shape=4.5 (largest), material=play-doh, start method=highest-point, shrink=disabled
 ----------------------------------------------------------------------------------
 
-python3 roll_dough.py -m play-doh -sm centroid-2d -em target -es -tc time -tv 300 -vo -ld ./logs/exp02
+python3 roll_dough.py -m play-doh -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp02
 
-python3 roll_dough.py -m play-doh -sm centroid-2d -em target -tc time -tv 300 -vo -ld ./logs/exp02
+python3 roll_dough.py -m play-doh -sm highest-point -em current -tc time -tv 300 -vo -ld ./logs/exp02
+
 
 ----------------------------------------------------------------------------------
 # Experiment 3 [exp03] - compare 2 end methods across 3 target shape sizes
