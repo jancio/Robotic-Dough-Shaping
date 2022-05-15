@@ -62,10 +62,10 @@ Z_MIN = 0.06 # prev contact value = 0.065 meters
 # Maximum depth in point cloud coordinates
 MAX_DEPTH = 0.60100262777 # TODO: might need to check 0.60642844 inverse
 
-ROLLING_PIN_WIDTH = 0.061   # meters
-ROLLING_PIN_RADIUS = 0.017  # meters
+ROLLING_PIN_WIDTH = 0.061 - 0.002  # meters (compensate for looseness)
+ROLLING_PIN_RADIUS = 0.017 - 0.004 - 0.003 # meters (compensate for looseness and pin curvature)
 SHRINK_HEIGHT_OFFSET = 0.02 # meters
-SHRINK_PIXEL_TOLERANCE = 2  # 2 pixels (corresponds to about 2 mm which is the width of the target shape outline)
+SHRINK_PIXEL_TOLERANCE = 4  # 2 pixels (corresponds to about 2 mm which is the width of the target shape outline)
 
 # Transformation matrix: camera_depth_optical_frame -> wx250s/base_link
 T_pc2ro = np.array([[ 0.08870469, -0.9955393 , -0.03213995,  0.175572                ],
@@ -370,23 +370,28 @@ def calculate_roll_start_and_end(params, current_shape_contour, iou, max_dough_h
         #     Calculate the roll end point E (in 2D)
         #     Correct the start point S (in 2D)
         if furthest_outside_pt is not None:
-            # Set the end point E_im to a point on the line furthest_outside_pt->C at the distance |S_im,C| from furthest_outside_pt
+            do_shrink = True
+            print(f'Current dough shape exceeds the target shape! => Applying the SHRINK action')
+            
+            # Set the end point E_im to a closest point on the target shape in the direction furthest_outside_pt->C
+            # This approach should work with the highest-point start method
             u = (C - furthest_outside_pt) / np.linalg.norm(C - furthest_outside_pt)
-            dist = np.linalg.norm(C - S_im)
-            if dist > 4*SHRINK_PIXEL_TOLERANCE:
-                do_shrink = True
-                print(f'Current dough shape exceeds the target shape! => Applying the SHRINK action')
-                E_im = furthest_outside_pt + dist*u
-                E_im = E_im.astype(int)
-                # Alternative: Set the end point E_im in the direction S_im->C at the distance |S_im,C| from furthest_outside_pt
-                # E_im = furthest_outside_pt + (C - S_im)
+            dist = np.sqrt(furthest_outside_pt_dist_squared) - (R - SHRINK_PIXEL_TOLERANCE)
+            E_im = furthest_outside_pt + dist*u
+            # Alternative: Set the end point E_im to a point on the line furthest_outside_pt->C at the distance |S_im,C| from furthest_outside_pt
+            # u = (C - furthest_outside_pt) / np.linalg.norm(C - furthest_outside_pt)
+            # dist = np.linalg.norm(C - S_im)
+            # E_im = furthest_outside_pt + dist*u
+            # Alternative: Set the end point E_im in the direction S_im->C at the distance |S_im,C| from furthest_outside_pt
+            # E_im = furthest_outside_pt + (C - S_im)
+            E_im = E_im.astype(int)
 
-                # Correct the start point for shrink action
-                S_im = furthest_outside_pt
+            # Correct the start point for shrink action
+            S_im = furthest_outside_pt
 
-                # Transform from image to 2D point cloud coordinates
-                S_pc = np.dot(T_im2pc, np.array([*furthest_outside_pt, 1]))[:2]
-                depth_pc = MAX_DEPTH
+            # Transform from image to 2D point cloud coordinates
+            S_pc = np.dot(T_im2pc, np.array([*furthest_outside_pt, 1]))[:2]
+            depth_pc = MAX_DEPTH
 
     # Calculate the roll end point E (in 2D) when shrink action is disabled or current shape is entirely inside of the target shape
     if not do_shrink:
