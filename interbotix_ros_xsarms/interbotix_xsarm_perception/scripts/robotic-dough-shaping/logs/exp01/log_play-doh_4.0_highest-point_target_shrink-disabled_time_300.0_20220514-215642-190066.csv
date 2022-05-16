@@ -1,4 +1,0 @@
-"{""material"": ""play-doh"", ""start_method"": ""highest-point"", ""end_method"": ""target"", ""enable_shrink"": false, ""side_shrink"": false, ""termination_condition"": ""time"", ""termination_value"": 300.0, ""log_dir"": ""./logs/exp01"", ""z_above"": 0.15812, ""disable_robot"": false, ""visual_output"": true, ""visual_wait"": false, ""start_time"": 1652579801.5350127, ""target_shape"": {""type"": ""circle"", ""params"": {""center"": [358, 222], ""radius"": 51}}, ""preparation_time"": 0.6554467678070068}"
-Iteration,Time (s),IoU,Max dough height (m),Dough height at S (m)
-0,1.2267658710479736,0.30050165178025207,0.019725599699882523,0.019725599699882523
-1,8.151519775390625,0.0,0.01805751624163443,0.019725599699882523
