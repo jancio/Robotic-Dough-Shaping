@@ -1,7 +1,10 @@
 ##################################################################################################################################
-# Experiment notes
+# Robotic Dough Shaping - Experiment Setup Notes
+#   Project for Robot Manipulation (CS 6751), Cornell University, Spring 2022
+#   Group members: Di Ni, Xi Deng, Zeqi Gu, Henry Zheng, Jan (Janko) Ondras
 ##################################################################################################################################
-# Author: Janko Ondras (jo951030@gmail.com)
+# Author: 
+#   Jan (Janko) Ondras (jo951030@gmail.com)
 ##################################################################################################################################
 
 ##################################################################################################################################
@@ -43,10 +46,6 @@ python3 roll_dough.py -m kinetic-sand -sm centroid-3d -em target -tc time -tv 30
 python3 roll_dough.py -m kinetic-sand -sm highest-point -em target -tc time -tv 300 -vo -ld ./logs/exp01
 
 
-=> 
-    3x3 table of latest/max IOU OR plot over time
-
-
 ##################################################################################################################################
 # Experiment 2 [exp02] - compare 2 roll end point methods
 #                      - target shape = 4.5 inch (largest => to see difference), 
@@ -82,5 +81,4 @@ python3 roll_dough.py -m play-doh -sm highest-point -em target -es -ss -tc time 
 #                             roll end point method = target, 
 #                             shrink = disabled
 ##################################################################################################################################
-
 

@@ -1,9 +1,10 @@
 ##################################################################################################################################
 # Robotic Dough Shaping - Force sensing
 #   Project for Robot Manipulation (CS 6751), Cornell University, Spring 2022
+#   Group members: Di Ni, Xi Deng, Zeqi Gu, Henry Zheng, Jan (Janko) Ondras
 ##################################################################################################################################
 # Author: 
-#   Janko Ondras (jo951030@gmail.com)
+#   Jan (Janko) Ondras (jo951030@gmail.com)
 ##################################################################################################################################
 # Instructions:
 #   First, run: roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s
