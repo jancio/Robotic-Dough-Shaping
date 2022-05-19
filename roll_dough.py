@@ -1,14 +1,20 @@
 ##################################################################################################################################
-# Robotic Dough Shaping - Main file
+# Robotic Dough Shaping - Roll Dough GUI Application
 #   Project for Robot Manipulation (CS 6751), Cornell University, Spring 2022
+#   Group members: Di Ni, Xi Deng, Zeqi Gu, Henry Zheng, Jan (Janko) Ondras
 ##################################################################################################################################
 # Authors: 
-#   Janko Ondras (jo951030@gmail.com)
+#   Jan (Janko) Ondras (jo951030@gmail.com)
 #   Zeqi Gu (contributed to circle detection and color filtering)
+#   Henry Zheng (helped with testing)
 ##################################################################################################################################
 # Instructions:
-#   First, run: roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
-#   Then change to this directory and run: python3 roll_dough.py
+#   In one terminal:
+#     source ~/interbotix_ws/devel/source.bash
+#     roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
+#   In another terminal:
+#     cd <directory-this-file-is-located-in>
+#     python3 roll_dough.py -dr -vo -vw -m play-doh -sm highest-point -em target
 ##################################################################################################################################
 
 import json

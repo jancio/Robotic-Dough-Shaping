@@ -1,55 +1,103 @@
-# IN PROGRESS - TO BE UPDATED
+# Robotic Dough Shaping
+
+
+## About
+
+
+We address the problem of shaping a piece of dough-like deformable material into a 2D target shape presented upfront. We use a 6 degree-of-freedom WidowX-250 Robot Arm equipped with a rolling pin and information collected from an RGB-D camera and a tactile sensor.
+
+We present and compare several control policies, including a dough shrinking action, in extensive experiments across three kinds of deformable materials and across three target dough shapes, achieving the intersection over union (IoU) of 0.90. 
+
+Our results show that: i) rolling dough from the highest dough point is more efficient than from the 2D/3D dough centroid; ii) it might be better to stop the roll movement at the current dough boundary as opposed to the target shape outline; iii) the shrink action might be beneficial only if properly tuned with respect to the expand action; and iv) the Play-Doh material is easier to shape to a target shape as compared to Plasticine or Kinetic sand.
+
+The full paper is available at ...
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+
+## Video Demo
+
+
+[![Watch the video demo](https://img.youtube.com/vi/orJKvwmmX6k/maxresdefault.jpg)](https://youtu.be/orJKvwmmX6k)
+
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+
+## Getting Started
+
+First, set up an interbotix workspace `interbotix_ws` with [interbotix_ros_manipulators](https://github.com/Interbotix/interbotix_ros_manipulators), [interbotix_ros_core](https://github.com/Interbotix/interbotix_ros_core), and [interbotix_ros_toolboxes](https://github.com/Interbotix/interbotix_ros_toolboxes) repositories.
+
+Tune your camera-to-robot frame transformation and point cloud filter parameters. The [configs](./configs/) folder contains *our*
+
+- camera-to-robot frame transformation from `interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/launch/xsarm_perception.launch` in the interbotix_ros_manipulators repo
+
+- point cloud filter parameters from `interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/config/filter_params.yaml` in the interbotix_ros_manipulators repo
+
+
+To run the Roll Dough GUI Application:
+
+1. In one terminal run
+    ```
+    source ~/interbotix_ws/devel/source.bash
+    roslaunch interbotix_xsarm_perception xsarm_perception.launch robot_model:=wx250s use_pointcloud_tuner_gui:=true
+    ```
+
+2. Clone this repo
+    ```
+    git clone https://github.com/jancio/Robotic-Dough-Shaping.git
+    ```
+
+3. In another terminal run
+    ```
+    cd <directory-roll_dough.py-file-is-located-in>
+    python3 roll_dough.py -dr -vo -vw -m play-doh -sm highest-point -em target
+    ```
+
+The code for force sensing is located in the [force-sensing](./force-sensing/) folder.
+
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+
+## Details about experiments
 
 
 
-![manipulator_banner](images/manipulator_banner.png)
+<p align="right">(<a href="#top">back to top</a>)</p>
 
-## Overview
-![manipulator_repo_structure](images/manipulator_repo_structure.png)
-Welcome to the *interbotix_ros_manipulators* repository! This repo contains custom ROS packages to control the various types of arms sold at [Interbotix](https://www.trossenrobotics.com/). These ROS packages build upon the ROS driver nodes found in the [interbotix_ros_core](https://github.com/Interbotix/interbotix_ros_core) repository. Support-level software can be found in the [interbotix_ros_toolboxes](https://github.com/Interbotix/interbotix_ros_toolboxes) repository.
 
-## Repo Structure
-```
-GitHub Landing Page: Explains repository structure and contains a single directory for each type of manipulator.
-├── Manipulator Type X Landing Page: Contains 'core' arm ROS packages.
-│   ├── Core Arm ROS Package 1
-│   ├── Core Arm ROS Package 2
-│   ├── Core Arm ROS Package X
-│   └── Examples: contains 'demo' arm ROS packages that build upon some of the 'core' arm ROS packages
-│       ├── Demo Arm ROS Package 1
-│       ├── Demo Arm ROS Package 2
-│       ├── Demo Arm ROS Package X
-│       └── Demo Scripts: contains example scripts that build upon the interface modules in the interbotix_ros_toolboxes repository
-│           ├── Demo Script 1
-│           ├── Demo Script 2
-|           └── Demo Script X
-├── LICENSE
-└── README.md
-```
-As shown above, there are five main levels to this repository. To clarify some of the terms above, refer to the descriptions below.
+## Roadmap
 
-- **Manipulator Type** - Any robotic arm that can use the same *interbotix_XXarm_control* package is considered to be of the same type. For the most part, this division lies on the type of actuator that makes up the robot. As an example, all the X-Series arms are considered the same type of manipulator since they all use various Dynamixel X-Series servos (despite the fact that they come in different sizes, DOF, and motor versions). However, a robotic arm made up of some other manufacturer's servos, or even half made up of Dynamixel servos and half made up of some other manufacturer's servos would be considered a different manipulator type.
 
-- **Core Arm ROS Package** - This refers to 'High Profile' ROS packages that are essential to make a given arm work. Examples of 'High Profile' ROS packages include:
-    - *interbotix_XXarm_control* - sets up the proper configurations and makes it possible to control the physical arm
-    - *interbotix_XXarm_moveit* - sets up the proper configurations and makes it possible to control an arm via MoveIt
-    - *interbotix_XXarm_gazebo* - sets up the proper configurations and makes it possible to control a Gazebo simulated arm
-    - *interbotix_XXarm_ros_control*  - ROS control package used with MoveIt to control the physical arms
-    - *interbotix_XXarm_descriptions* - contains URDFs and meshes of the arms, making it possible to visualize them in RViz
+- [x] Add Roll Dough GUI Application
+- [x] Add force sensing code
+- [ ] Refactor Roll Dough GUI Application in an OOP style
+- [ ] Do not raise exception when target shape is not detected but wait for key press to repeat target shape detection
+- [ ] Display last state in GUI if the target shape is fully covered with dough
+- [ ] Support new shapes (e.g. ellipse)
+- [ ] Add full link to the full paper/report
 
-- **Demo Arm ROS Package** - This refers to demo ROS packages that build upon the **Core Arm ROS Packages**. ROS researchers could use these packages as references to learn how to develop their own ROS packages and to get a feel for how the robot works. Typical demos for a given manipulator type include:
-    - *interbotix_XXarm_joy* - manipulate an arm's end-effector using a joystick controller
-    - *interbotix_XXarm_puppet* - make one or more 'puppet' arms copy the motion of a 'master' arm
-    - *interbotix_XXarm_moveit_interface* - learn how to use MoveIt!'s MoveGroup Python or C++ APIs to control a robot arm
 
-- **Demo Script** - This refers to demo scripts that build upon the interface modules in the *interbotix_ros_toolboxes* repository. These modules essentially abstract away all ROS code, making it easy for a researcher with no ROS experience to interface with an arm as if it was just another object. It also makes sequencing robot motion a piece of cake. These scripts are written in languages that users may feel more comfortable with like Python and MATLAB.
 
-Over time, the repo will grow to include more types of manipulators.
+<p align="right">(<a href="#top">back to top</a>)</p>
 
-## Contributing
-Feel free to send PRs to add features to currently existing Arm ROS packages or to include new ones. Note that all PRs should follow the structure and naming conventions outlined in the repo including documentation.
+## Authors
 
-## Contributors
-- [Solomon Wiznitzer](https://github.com/swiz23) - **ROS Engineer**
-- [Luke Schmitt](https://github.com/lsinterbotix) - **Robotics Software Engineer**
-- [Levi Todes](https://github.com/LeTo37) - **CAD Engineer**
+
+- Di Ni
+- Xi Deng
+- Zeqi Gu
+- Henry Zheng
+- Jan (Janko) Ondras
+
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+## Contact
+
+
+Jan (Janko) Ondras (jo951030@gmail.com)
+
+
+<p align="right">(<a href="#top">back to top</a>)</p>
