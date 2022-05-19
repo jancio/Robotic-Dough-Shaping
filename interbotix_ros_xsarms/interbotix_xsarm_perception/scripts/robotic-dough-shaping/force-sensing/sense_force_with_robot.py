@@ -1,5 +1,5 @@
 ##################################################################################################################################
-# Robotic Dough Shaping - Force sensing
+# Robotic Dough Shaping - Force sensing: move the robot
 #   Project for Robot Manipulation (CS 6751), Cornell University, Spring 2022
 #   Group members: Di Ni, Xi Deng, Zeqi Gu, Henry Zheng, Jan (Janko) Ondras
 ##################################################################################################################################
