@@ -1,0 +1,3 @@
+"{""start_method"": ""centroid-2d"", ""end_method"": ""current"", ""termination_condition"": ""time"", ""termination_value"": 10.0, ""log_dir"": ""/home/RoboG1/interbotix_ws/src/interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/scripts/robotic-dough-shaping/logs"", ""z_above"": 0.15812, ""disable_robot"": true, ""debug_vision"": true, ""type"": ""circle"", ""params"": {""center"": [378, 196], ""radius"": 51}}"
+Iteration,Time,IoU
+0,1.8971145153045654,0.5348468204564872
