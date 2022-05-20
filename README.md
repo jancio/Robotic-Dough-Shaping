@@ -78,67 +78,80 @@ to evaluate
 
 We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ min for each run.
 
-1. **Performance across materials**
-    - Settings
-        - Target shape: $T_{4.0}$ (4 inch diameter)
-        
-        - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
-        - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
-        - Roll end point method: *Target*
-        - Shrink action variant: *Shrink-Disabled*
-    - Experiment 1 in video demo
-    - Experiment A in paper
-    - Logs: ./logs/exp01/
+<details>
+  <summary>1. Performance across materials</summary>
 
+- Settings
+    - Target shape: $T_{4.0}$ (4 inch diameter)
+    
+    - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
+    - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
+    - Roll end point method: *Target*
+    - Shrink action variant: *Shrink-Disabled*
+- Experiment 1 in video demo
+- Experiment A in paper
+- Logs: ./logs/exp01/
+</details>
 
-2. **Roll start point methods**
-    - Settings
-        - Target shape: $T_{4.0}$ (4 inch diameter)
-        
-        - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
-        - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
-        - Roll end point method: *Target*
-        - Shrink action variant: *Shrink-Disabled*
-    - Experiment 2 in video demo
-    - Experiment B in paper
-    - Logs: ./logs/exp01/
+<details>
+  <summary>2. Roll start point methods</summary>
 
-3. **Roll end point methods**
-    - Settings
-        - Target shape: $T_{4.5}$ (4.5 inch diameter)
-        
-        - Material: *Play-Doh*
-        - Roll start point method: *Highest-Point*
-        - Roll end point method: *Target*, *Current*
-        - Shrink action variant: *Shrink-Disabled*
-    - Experiment 3 in video demo
-    - Experiment C in paper
-    - Logs: ./logs/exp02/
+- Settings
+    - Target shape: $T_{4.0}$ (4 inch diameter)
+    
+    - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
+    - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
+    - Roll end point method: *Target*
+    - Shrink action variant: *Shrink-Disabled*
+- Experiment 2 in video demo
+- Experiment B in paper
+- Logs: ./logs/exp01/
+</details>
 
-4. **Shrink action**
-    - Settings
-        - Target shape: $T_{3.5}$ (3.5 inch diameter)
-        
-        - Material: *Play-Doh*
-        - Roll start point method: *Highest-Point*
-        - Roll end point method: *Target*
-        - Shrink action variant: *Shrink-Disabled*, *Forward-Shrink*, *Side-Shrink*
-    - Experiment 4 in video demo
-    - Experiment D in paper
-    - Logs: ./logs/exp03/
+<details>
+  <summary>3. Roll end point methods</summary>
 
-5. **Performance across target shapes**
-    - Settings
-        - Target shape: $T_{3.5}$ (3.5 inch diameter), $T_{4.0}$ (4 inch diameter), $T_{4.5}$ (4.5 inch diameter)
-        
-        - Material: *Play-Doh*
-        - Roll start point method: *Highest-Point*
-        - Roll end point method: *Target*
-        - Shrink action variant: *Shrink-Disabled*
-    - Not in video demo
-    - Experiment E in paper
-	- Logs: in all three folders ./logs/exp0{1,2,3}/
+- Settings
+    - Target shape: $T_{4.5}$ (4.5 inch diameter)
+    
+    - Material: *Play-Doh*
+    - Roll start point method: *Highest-Point*
+    - Roll end point method: *Target*, *Current*
+    - Shrink action variant: *Shrink-Disabled*
+- Experiment 3 in video demo
+- Experiment C in paper
+- Logs: ./logs/exp02/
+</details>
 
+<details>
+  <summary>4. Shrink action</summary>
+
+- Settings
+    - Target shape: $T_{3.5}$ (3.5 inch diameter)
+    
+    - Material: *Play-Doh*
+    - Roll start point method: *Highest-Point*
+    - Roll end point method: *Target*
+    - Shrink action variant: *Shrink-Disabled*, *Forward-Shrink*, *Side-Shrink*
+- Experiment 4 in video demo
+- Experiment D in paper
+- Logs: ./logs/exp03/
+</details>
+
+<details>
+  <summary>5. Performance across target shapes</summary>
+
+- Settings
+    - Target shape: $T_{3.5}$ (3.5 inch diameter), $T_{4.0}$ (4 inch diameter), $T_{4.5}$ (4.5 inch diameter)
+    
+    - Material: *Play-Doh*
+    - Roll start point method: *Highest-Point*
+    - Roll end point method: *Target*
+    - Shrink action variant: *Shrink-Disabled*
+- Not in video demo
+- Experiment E in paper
+- Logs: in all three folders ./logs/exp0{1,2,3}/
+</details>
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
