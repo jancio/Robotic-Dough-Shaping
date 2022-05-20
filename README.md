@@ -28,7 +28,7 @@ The full paper is available at ...
 
 First, set up an interbotix workspace `interbotix_ws` with [interbotix_ros_manipulators](https://github.com/Interbotix/interbotix_ros_manipulators), [interbotix_ros_core](https://github.com/Interbotix/interbotix_ros_core), and [interbotix_ros_toolboxes](https://github.com/Interbotix/interbotix_ros_toolboxes) repositories.
 
-Tune your camera-to-robot frame transformation and point cloud filter parameters. The [configs](./configs/) folder contains *our*
+Tune your camera-to-robot frame transformation and point cloud filter parameters. The [configs](./configs/) folder contains *our* configurations.
 
 - camera-to-robot frame transformation from `interbotix_ros_manipulators/interbotix_ros_xsarms/interbotix_xsarm_perception/launch/xsarm_perception.launch` in the interbotix_ros_manipulators repo
 
@@ -54,14 +54,83 @@ To run the Roll Dough GUI Application:
     python3 roll_dough.py -dr -vo -vw -m play-doh -sm highest-point -em target
     ```
 
+4. See [roll_dough.py](./roll_dough.py) for all the command line options.
+
 The code for force sensing is located in the [force-sensing](./force-sensing/) folder.
 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 
-## Details about experiments
+## Experiments
 
+
+We performed the following experiments across 
+- three target shapes ($T_{3.5}$ , $T_{4.0}$ , $T_{4.5}$) and 
+- three materials (*Play-Doh*, *Plasticine*, *Kinetic sand*)
+
+to evaluate 
+- roll start point methods (*Centroid-2D*, *Centroid-3D*, *Highest-Point*), 
+- roll end point methods (*Target*, *Current*), and
+- shrink action variants (*Shrink-Disabled*, *Forward-Shrink*, *Side-Shrink*).
+
+We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ min for each run.
+
+1. **Performance across materials**
+    - Settings
+        - Target shape: $T_{4.0}$ (4 inch diameter)
+        - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
+        - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
+        - Roll end point method: *Target*
+        - Shrink action variant: *Shrink-Disabled*
+    - Experiment 1 in video demo
+    - Experiment A in paper
+    - Logs: ./logs/exp01/
+
+
+2. **Roll start point methods**
+    - Settings
+        - Target shape: $T_{4.0}$ (4 inch diameter)
+        - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
+        - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
+        - Roll end point method: *Target*
+        - Shrink action variant: *Shrink-Disabled*
+    - Experiment 2 in video demo
+    - Experiment B in paper
+    - Logs: ./logs/exp01/
+
+3. **Roll end point methods**
+    - Settings
+        - Target shape: $T_{4.5}$ (4.5 inch diameter)
+        - Material: *Play-Doh*
+        - Roll start point method: *Highest-Point*
+        - Roll end point method: *Target*, *Current*
+        - Shrink action variant: *Shrink-Disabled*
+    - Experiment 3 in video demo
+    - Experiment C in paper
+    - Logs: ./logs/exp02/
+
+4. **Shrink action**
+    - Settings
+        - Target shape: $T_{3.5}$ (3.5 inch diameter)
+        - Material: *Play-Doh*
+        - Roll start point method: *Highest-Point*
+        - Roll end point method: *Target*
+        - Shrink action variant: *Shrink-Disabled*, *Forward-Shrink*, *Side-Shrink*
+    - Experiment 4 in video demo
+    - Experiment D in paper
+    - Logs: ./logs/exp03/
+
+5. **Performance across target shapes**
+    - Settings
+        - Target shape: $T_{3.5}$ (3.5 inch diameter), $T_{4.0}$ (4 inch diameter), $T_{4.5}$ (4.5 inch diameter)
+        - Material: *Play-Doh*
+        - Roll start point method: *Highest-Point*
+        - Roll end point method: *Target*
+        - Shrink action variant: *Shrink-Disabled*
+    - Not in video demo
+    - Experiment E in paper
+	- Logs: in all three folders ./logs/exp0{1,2,3}/
 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
