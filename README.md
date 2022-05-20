@@ -18,7 +18,11 @@ The full paper is available at ...
 ## Video Demo
 
 
-[![Watch the video demo](https://img.youtube.com/vi/orJKvwmmX6k/maxresdefault.jpg)](https://youtu.be/orJKvwmmX6k)
+[![Watch the video demo](./media/video_demo_thumbnail.png)](https://youtu.be/ZzLMxuITdt4)
+
+<!-- If you want to use the YouTube thumbnail
+[![Watch the video demo](https://img.youtube.com/vi/ZzLMxuITdt4/maxresdefault.jpg)](https://youtu.be/ZzLMxuITdt4)
+ -->
 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
