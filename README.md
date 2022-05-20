@@ -83,7 +83,7 @@ to evaluate
 We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ min for each run.
 
 <details>
-  <summary>1. Performance across materials</summary>
+  <summary><b>1. Performance across materials</b> (click to expand)</summary>
 
 - Settings
     - Target shape: $T_{4.0}$ (4 inch diameter)
@@ -98,7 +98,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 </details>
 
 <details>
-  <summary>2. Roll start point methods</summary>
+  <summary><b>2. Roll start point methods</b> (click to expand)</summary>
 
 - Settings
     - Target shape: $T_{4.0}$ (4 inch diameter)
@@ -113,7 +113,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 </details>
 
 <details>
-  <summary>3. Roll end point methods</summary>
+  <summary><b>3. Roll end point methods</b> (click to expand)</summary>
 
 - Settings
     - Target shape: $T_{4.5}$ (4.5 inch diameter)
@@ -128,7 +128,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 </details>
 
 <details>
-  <summary>4. Shrink action</summary>
+  <summary><b>4. Shrink action</b> (click to expand)</summary>
 
 - Settings
     - Target shape: $T_{3.5}$ (3.5 inch diameter)
@@ -143,7 +143,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 </details>
 
 <details>
-  <summary>5. Performance across target shapes</summary>
+  <summary><b>5. Performance across target shapes</b> (click to expand)</summary>
 
 - Settings
     - Target shape: $T_{3.5}$ (3.5 inch diameter), $T_{4.0}$ (4 inch diameter), $T_{4.5}$ (4.5 inch diameter)
