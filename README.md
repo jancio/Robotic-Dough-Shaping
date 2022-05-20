@@ -65,8 +65,10 @@ The code for force sensing is located in the [force-sensing](./force-sensing/) f
 ## Experiments
 
 
-We performed the following experiments across 
-- three target shapes ($T_{3.5}$ , $T_{4.0}$ , $T_{4.5}$) and 
+We performed the following experiments across
+
+- three target shapes ($T_{3.5}$ , $T_{4.0}$ , $T_{4.5}$) and
+
 - three materials (*Play-Doh*, *Plasticine*, *Kinetic sand*)
 
 to evaluate 
@@ -79,6 +81,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 1. **Performance across materials**
     - Settings
         - Target shape: $T_{4.0}$ (4 inch diameter)
+        
         - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
         - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
         - Roll end point method: *Target*
@@ -91,6 +94,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 2. **Roll start point methods**
     - Settings
         - Target shape: $T_{4.0}$ (4 inch diameter)
+        
         - Material: *Play-Doh*, *Plasticine*, *Kinetic sand*
         - Roll start point method: *Centroid-2D*, *Centroid-3D*, *Highest-Point*
         - Roll end point method: *Target*
@@ -102,6 +106,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 3. **Roll end point methods**
     - Settings
         - Target shape: $T_{4.5}$ (4.5 inch diameter)
+        
         - Material: *Play-Doh*
         - Roll start point method: *Highest-Point*
         - Roll end point method: *Target*, *Current*
@@ -113,6 +118,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 4. **Shrink action**
     - Settings
         - Target shape: $T_{3.5}$ (3.5 inch diameter)
+        
         - Material: *Play-Doh*
         - Roll start point method: *Highest-Point*
         - Roll end point method: *Target*
@@ -124,6 +130,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 5. **Performance across target shapes**
     - Settings
         - Target shape: $T_{3.5}$ (3.5 inch diameter), $T_{4.0}$ (4 inch diameter), $T_{4.5}$ (4.5 inch diameter)
+        
         - Material: *Play-Doh*
         - Roll start point method: *Highest-Point*
         - Roll end point method: *Target*
