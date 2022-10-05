@@ -72,7 +72,7 @@ The code for force sensing is located in the [force-sensing](./force-sensing/) f
 
 We performed the following experiments across
 
-- three target shapes ($T_{3.5}$ , $T_{4.0}$ , $T_{4.5}$) and
+- three target shapes ( $T_{3.5}$ , $T_{4.0}$ , $T_{4.5}$ ) and
 
 - three materials (*Play-Doh*, *Plasticine*, *Kinetic sand*)
 
