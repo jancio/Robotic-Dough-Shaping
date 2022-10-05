@@ -4,13 +4,14 @@
 ## About
 
 
-We address the problem of shaping a piece of dough-like deformable material into a 2D target shape presented upfront. We use a 6 degree-of-freedom WidowX-250 Robot Arm equipped with a rolling pin and information collected from an RGB-D camera and a tactile sensor.
+Robotic manipulation of deformable objects gains great attention due to its wide applications including medical surgery, home assistance, and automatic food preparation. The ability to deform soft objects remains a great challenge for robots due to difficulties in defining the problem mathematically. 
 
-We present and compare several control policies, including a dough shrinking action, in extensive experiments across three kinds of deformable materials and across three target dough shapes, achieving the intersection over union (IoU) of 0.90. 
+We address the problem of shaping a piece of dough-like deformable material into a 2D target shape presented upfront. We use a 6 degree-of-freedom WidowX-250 Robot Arm equipped with a rolling pin and information collected from an RGB-D camera and a tactile sensor. We present and compare several control policies, including a dough shrinking action, in extensive experiments across three kinds of deformable materials and across three target dough shape sizes, achieving the intersection over union (IoU) of 0.90. 
 
-Our results show that: i) rolling dough from the highest dough point is more efficient than from the 2D/3D dough centroid; ii) it might be better to stop the roll movement at the current dough boundary as opposed to the target shape outline; iii) the shrink action might be beneficial only if properly tuned with respect to the expand action; and iv) the Play-Doh material is easier to shape to a target shape as compared to Plasticine or Kinetic sand.
+Our results show that: i) rolling dough from the highest dough point is more efficient than from the 2D/3D dough centroid; ii) it might be better to stop the roll movement at the current dough boundary as opposed to the target shape outline; iii) the shrink action might be beneficial only if properly tuned with respect to the expand action; and iv) the Play-Doh material is easier to shape to a target shape as compared to Plasticine or Kinetic sand. Video demonstrations of our work are available at https://youtu.be/ZzLMxuITdt4
 
-The full paper is available at ...
+The full **paper** is available at https://arxiv.org/abs/2208.00386<br>
+To be published in International Conference on Control, Automation and Systems (ICCAS), 2022
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -183,6 +184,9 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 - Zeqi Gu
 - Henry Zheng
 - Jan (Janko) Ondras
+- Tapomayukh Bhattacharjee
+
+@Cornell University
 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
@@ -190,7 +194,7 @@ We ran each experiment $N=3$ times and set the maximum time limit $T_{max} = 5$ 
 ## Contact
 
 
-Jan (Janko) Ondras (jo951030@gmail.com)
+Jan (Janko) Ondras (jankondras@gmail.com)
 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
